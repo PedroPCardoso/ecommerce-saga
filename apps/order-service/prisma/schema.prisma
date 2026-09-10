@@ -48,3 +48,15 @@ model IdempotencyKey {
   @@id([key, customerId])
   @@map("idempotency_keys")
 }
+
+// Espelha packages/idempotency/src/schema.sql. A chave é o par
+// (event_id, consumer_group) — não só event_id — porque outro consumer
+// group processaria o MESMO evento sem que um bloqueie o outro.
+model ProcessedMessage {
+  eventId       String   @map("event_id")
+  consumerGroup String   @map("consumer_group")
+  processedAt   DateTime @default(now()) @map("processed_at")
+
+  @@id([eventId, consumerGroup])
+  @@map("processed_messages")
+}

@@ -5,7 +5,9 @@ import { OrdersController } from './api/orders.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
 import { OutboxRelayService } from './infrastructure/outbox-relay.service.js';
+import { OrderProjectionConsumerService } from './infrastructure/order-projection-consumer.service.js';
 import { CreateOrderUseCase } from './application/create-order.use-case.js';
+import { OrderProjectionHandler } from './application/order-projection.handler.js';
 
 @Module({
   imports: [ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 100 }] })],
@@ -14,6 +16,8 @@ import { CreateOrderUseCase } from './application/create-order.use-case.js';
     PrismaService,
     OutboxRelayService,
     CreateOrderUseCase,
+    OrderProjectionHandler,
+    OrderProjectionConsumerService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })

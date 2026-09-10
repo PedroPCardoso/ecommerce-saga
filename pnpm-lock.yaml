@@ -203,6 +203,9 @@ importers:
       '@ecommerce/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@ecommerce/idempotency':
+        specifier: workspace:*
+        version: link:../../packages/idempotency
       '@ecommerce/kafka':
         specifier: workspace:*
         version: link:../../packages/kafka

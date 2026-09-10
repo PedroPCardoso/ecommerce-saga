@@ -1,0 +1,228 @@
+import { randomUUID } from 'node:crypto';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { createEvent, inventoryEvents, paymentEvents, shippingEvents } from '@ecommerce/contracts';
+import { PrismaService } from '../src/infrastructure/prisma.service.js';
+import { OrderProjectionHandler } from '../src/application/order-projection.handler.js';
+
+const ADDRESS = {
+  street: 'Rua Teste',
+  number: '100',
+  district: 'Centro',
+  city: 'São Paulo',
+  state: 'SP',
+  zipCode: '01000-000',
+  country: 'BR',
+};
+
+function makePaymentApproved(orderId: string) {
+  return createEvent(paymentEvents.paymentApproved, {
+    aggregateId: orderId,
+    correlationId: orderId,
+    producer: 'payment-service-test@0.0.0',
+    payload: {
+      paymentId: randomUUID(),
+      orderId,
+      amountCents: 2000,
+      currency: 'BRL',
+      authorizationCode: 'AUTH-TEST-1',
+      instrument: { gatewayToken: 'tok_test_1', cardLast4: '4242', brand: 'VISA' },
+      approvedAt: new Date().toISOString(),
+    },
+  });
+}
+
+function makePaymentFailed(orderId: string) {
+  return createEvent(paymentEvents.paymentFailed, {
+    aggregateId: orderId,
+    correlationId: orderId,
+    producer: 'payment-service-test@0.0.0',
+    payload: {
+      paymentId: randomUUID(),
+      orderId,
+      amountCents: 2000,
+      currency: 'BRL',
+      failureCode: 'CARD_DECLINED',
+      reason: 'Cartão recusado pelo emissor',
+      failedAt: new Date().toISOString(),
+    },
+  });
+}
+
+function makeStockReserved(orderId: string) {
+  return createEvent(inventoryEvents.stockReserved, {
+    aggregateId: orderId,
+    correlationId: orderId,
+    producer: 'inventory-service-test@0.0.0',
+    payload: {
+      reservationId: randomUUID(),
+      orderId,
+      items: [{ sku: 'BOOK-001', quantity: 2 }],
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      reservedAt: new Date().toISOString(),
+    },
+  });
+}
+
+function makeStockUnavailable(orderId: string) {
+  return createEvent(inventoryEvents.stockUnavailable, {
+    aggregateId: orderId,
+    correlationId: orderId,
+    producer: 'inventory-service-test@0.0.0',
+    payload: {
+      orderId,
+      unavailableItems: [{ sku: 'OUT-999', requested: 3, available: 0 }],
+      checkedAt: new Date().toISOString(),
+    },
+  });
+}
+
+function makeShipmentCreated(orderId: string) {
+  return createEvent(shippingEvents.shipmentCreated, {
+    aggregateId: orderId,
+    correlationId: orderId,
+    producer: 'shipping-service-test@0.0.0',
+    payload: {
+      shipmentId: randomUUID(),
+      orderId,
+      carrier: 'CORREIOS',
+      trackingCode: 'BR123456789',
+      labelUrl: 'https://labels.example.com/BR123456789',
+      estimatedDeliveryAt: new Date(Date.now() + 86_400_000).toISOString(),
+      createdAt: new Date().toISOString(),
+    },
+  });
+}
+
+function makeShipmentFailed(orderId: string) {
+  return createEvent(shippingEvents.shipmentFailed, {
+    aggregateId: orderId,
+    correlationId: orderId,
+    producer: 'shipping-service-test@0.0.0',
+    payload: {
+      orderId,
+      failureCode: 'ADDRESS_NOT_SERVICEABLE',
+      reason: 'CEP fora da área de cobertura',
+      failedAt: new Date().toISOString(),
+    },
+  });
+}
+
+describe('OrderProjectionHandler (integração — Postgres real, requer pnpm infra:up)', () => {
+  const prisma = new PrismaService();
+  const handler = new OrderProjectionHandler(prisma);
+
+  async function createTestOrder(): Promise<string> {
+    const orderId = randomUUID();
+    await prisma.client.order.create({
+      data: {
+        id: orderId,
+        customerId: randomUUID(),
+        items: [{ sku: 'BOOK-001', name: 'Livro', quantity: 2, unitPriceCents: 1000 }],
+        totalAmountCents: 2000,
+        currency: 'BRL',
+        status: 'PENDING',
+        shippingAddress: ADDRESS,
+      },
+    });
+    return orderId;
+  }
+
+  beforeEach(async () => {
+    await prisma.onModuleInit();
+    await prisma.client.outbox.deleteMany();
+    await prisma.client.processedMessage.deleteMany();
+    await prisma.client.idempotencyKey.deleteMany();
+    await prisma.client.order.deleteMany();
+  });
+
+  afterAll(async () => {
+    await prisma.onModuleDestroy();
+  });
+
+  it('caminho feliz: payment.approved -> stock.reserved -> shipment.created leva o pedido a CONFIRMED e publica order.confirmed', async () => {
+    const orderId = await createTestOrder();
+
+    await handler.handle(makePaymentApproved(orderId));
+    let order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('PAYMENT_APPROVED');
+
+    await handler.handle(makeStockReserved(orderId));
+    order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('STOCK_RESERVED');
+
+    await handler.handle(makeShipmentCreated(orderId));
+    order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('CONFIRMED');
+
+    const outboxRows = await prisma.client.outbox.findMany({ where: { aggregateId: orderId } });
+    expect(outboxRows).toHaveLength(1);
+    expect(outboxRows[0]?.eventType).toBe('order.confirmed');
+    const payload = outboxRows[0]?.payload as { payload: { customerId: string } };
+    expect(payload.payload.customerId).toBe(order.customerId);
+  });
+
+  it('payment.failed leva o pedido de PENDING direto a CANCELLED e publica order.cancelled com compensationsApplied vazio', async () => {
+    const orderId = await createTestOrder();
+
+    await handler.handle(makePaymentFailed(orderId));
+
+    const order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('CANCELLED');
+
+    const outboxRows = await prisma.client.outbox.findMany({ where: { aggregateId: orderId } });
+    expect(outboxRows).toHaveLength(1);
+    expect(outboxRows[0]?.eventType).toBe('order.cancelled');
+    const payload = outboxRows[0]?.payload as {
+      payload: { reason: string; compensationsApplied: string[] };
+    };
+    expect(payload.payload.reason).toBe('PAYMENT_FAILED');
+    expect(payload.payload.compensationsApplied).toEqual([]);
+  });
+
+  it('stock.unavailable leva o pedido a COMPENSATING (não fecha sozinho — I4 ainda não implementado) e não publica order.cancelled', async () => {
+    const orderId = await createTestOrder();
+
+    await handler.handle(makePaymentApproved(orderId));
+    await handler.handle(makeStockUnavailable(orderId));
+
+    const order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('COMPENSATING');
+
+    const outboxRows = await prisma.client.outbox.findMany({ where: { aggregateId: orderId } });
+    expect(outboxRows).toHaveLength(0);
+  });
+
+  it('shipment.failed leva o pedido a COMPENSATING (não fecha sozinho — I4 ainda não implementado)', async () => {
+    const orderId = await createTestOrder();
+
+    await handler.handle(makePaymentApproved(orderId));
+    await handler.handle(makeStockReserved(orderId));
+    await handler.handle(makeShipmentFailed(orderId));
+
+    const order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('COMPENSATING');
+  });
+
+  it('reentrega do MESMO evento (mesmo eventId) não reprocessa — idempotência', async () => {
+    const orderId = await createTestOrder();
+    const envelope = makePaymentApproved(orderId);
+
+    await handler.handle(envelope);
+    await handler.handle(envelope);
+
+    const order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('PAYMENT_APPROVED');
+  });
+
+  it('evento fora de ordem (stock.reserved antes de payment.approved) é ignorado com WARN, sem quebrar nem regredir o pedido', async () => {
+    const orderId = await createTestOrder();
+
+    await handler.handle(makeStockReserved(orderId));
+
+    const order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('PENDING');
+
+    const outboxRows = await prisma.client.outbox.findMany({ where: { aggregateId: orderId } });
+    expect(outboxRows).toHaveLength(0);
+  });
+});

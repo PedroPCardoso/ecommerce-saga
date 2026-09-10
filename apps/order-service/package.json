@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@ecommerce/contracts": "workspace:*",
+    "@ecommerce/idempotency": "workspace:*",
     "@ecommerce/kafka": "workspace:*",
     "@ecommerce/outbox": "workspace:*",
     "@nestjs/common": "^11.0.1",
