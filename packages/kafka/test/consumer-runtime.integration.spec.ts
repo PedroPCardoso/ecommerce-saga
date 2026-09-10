@@ -14,7 +14,9 @@ import { KafkaConsumerRuntime, type MessageContext } from '../src/consumer-runti
 
 const BROKERS = (process.env.KAFKA_BROKERS ?? 'localhost:29092').split(',');
 const SOURCE_TOPIC = 'lab.kcr.pedidos';
+const SOURCE_TOPIC_B = 'lab.kcr.pagamentos';
 const GROUP = 'lab-kcr-group' as ConsumerGroup;
+const GROUP_MULTI = 'lab-kcr-multi-group' as ConsumerGroup;
 
 async function waitUntil(predicate: () => boolean, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -49,6 +51,27 @@ function makeEnvelope(orderId: string) {
   });
 }
 
+/** Tópicos que um runtime precisa para um par (sourceTopic, group): origem + escada de retry + DLT. */
+function topicsFor(sourceTopic: string, group: ConsumerGroup): string[] {
+  return [
+    sourceTopic,
+    ...Array.from({ length: MAX_RETRY_ATTEMPTS }, (_, i) => retryTopic(sourceTopic, group, i)),
+    deadLetterTopic(sourceTopic, group),
+  ];
+}
+
+async function ensureTopics(admin: Admin, ...pairs: Array<[string, ConsumerGroup]>): Promise<void> {
+  const topics = pairs.flatMap(([sourceTopic, group]) => topicsFor(sourceTopic, group));
+  const existing = new Set(await admin.listTopics());
+  const missing = [...new Set(topics)].filter((t) => !existing.has(t));
+  if (missing.length > 0) {
+    await admin.createTopics({
+      waitForLeaders: true,
+      topics: missing.map((topic) => ({ topic, numPartitions: 1, replicationFactor: 1 })),
+    });
+  }
+}
+
 describe('KafkaConsumerRuntime (integração — Kafka real, requer pnpm infra:up)', () => {
   let admin: Admin;
   let producer: EventProducer;
@@ -58,19 +81,12 @@ describe('KafkaConsumerRuntime (integração — Kafka real, requer pnpm infra:u
     admin = kafka.admin();
     await admin.connect();
 
-    const topics = [
-      SOURCE_TOPIC,
-      ...Array.from({ length: MAX_RETRY_ATTEMPTS }, (_, i) => retryTopic(SOURCE_TOPIC, GROUP, i)),
-      deadLetterTopic(SOURCE_TOPIC, GROUP),
-    ];
-    const existing = new Set(await admin.listTopics());
-    const missing = topics.filter((t) => !existing.has(t));
-    if (missing.length > 0) {
-      await admin.createTopics({
-        waitForLeaders: true,
-        topics: missing.map((topic) => ({ topic, numPartitions: 1, replicationFactor: 1 })),
-      });
-    }
+    await ensureTopics(
+      admin,
+      [SOURCE_TOPIC, GROUP],
+      [SOURCE_TOPIC, GROUP_MULTI],
+      [SOURCE_TOPIC_B, GROUP_MULTI],
+    );
 
     producer = new EventProducer({ brokers: BROKERS, clientId: 'kcr-test-producer' });
     await producer.connect();
@@ -125,6 +141,37 @@ describe('KafkaConsumerRuntime (integração — Kafka real, requer pnpm infra:u
     await runtime.stop();
 
     expect(attempts).toBe(2);
+  }, 20_000);
+
+  it('com múltiplos sourceTopics, o retry-5s se recupera para AMBOS os tópicos (regressão do bug de groupId compartilhado)', async () => {
+    const orderIdA = randomUUID();
+    const orderIdB = randomUUID();
+    const attempts: Record<string, number> = { [orderIdA]: 0, [orderIdB]: 0 };
+    const runtime = new KafkaConsumerRuntime({
+      brokers: BROKERS,
+      groupId: GROUP_MULTI,
+      sourceTopics: [SOURCE_TOPIC, SOURCE_TOPIC_B],
+      producer,
+      handler: async (ctx) => {
+        const id = ctx.envelope.aggregateId;
+        if (id !== orderIdA && id !== orderIdB) return;
+        attempts[id] += 1;
+        if (attempts[id] < 2) throw new Error('ETIMEDOUT ao chamar serviço externo');
+      },
+    });
+    await runtime.start();
+
+    await producer.publish(SOURCE_TOPIC, makeEnvelope(orderIdA));
+    await producer.publish(SOURCE_TOPIC_B, makeEnvelope(orderIdB));
+    await waitUntil(() => attempts[orderIdA] >= 2 && attempts[orderIdB] >= 2, 15_000);
+    await runtime.stop();
+
+    // Antes do fix, os N consumidores de retry por rung compartilhavam o mesmo groupId
+    // (`${groupId}-${suffix}`) e competiam pelas partições de tópicos DIFERENTES: só um
+    // dos dois tópicos de origem tinha seu retry-5s efetivamente consumido, o outro
+    // travava aqui em `attempts < 2` até o timeout.
+    expect(attempts[orderIdA]).toBe(2);
+    expect(attempts[orderIdB]).toBe(2);
   }, 20_000);
 
   it('erro permanente vai direto para a DLT, sem passar pela escada', async () => {

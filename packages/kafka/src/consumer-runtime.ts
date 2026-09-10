@@ -73,7 +73,7 @@ export class KafkaConsumerRuntime {
     for (const sourceTopic of this.sourceTopics) {
       for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt += 1) {
         const topic = retryTopic(sourceTopic, this.groupId, attempt);
-        const rungGroupId = `${this.groupId}-${RETRY_LADDER[attempt]!.suffix}`;
+        const rungGroupId = `${this.groupId}-${sourceTopic}-${RETRY_LADDER[attempt]!.suffix}`;
         const consumer = this.kafka.consumer({ groupId: rungGroupId, sessionTimeout: 30_000 });
         await consumer.connect();
         await consumer.subscribe({ topics: [topic] });
