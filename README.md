@@ -26,14 +26,17 @@ POST /orders
     └─► order.created ──► Payment autoriza
                               ├── payment.failed ─────────────────────────► CANCELLED
                               └── payment.approved ──► Inventory reserva
-                                                          ├── stock.unavailable ──► Payment ESTORNA ──► CANCELLED
+                                                          ├── stock.unavailable ──► Payment ESTORNA* ──► CANCELLED
                                                           └── stock.reserved ──► Shipping etiqueta
-                                                                                     ├── shipment.failed ──► Payment ESTORNA
-                                                                                     │                    └► Inventory LIBERA ──► CANCELLED
+                                                                                     ├── shipment.failed ──► Payment ESTORNA*
+                                                                                     │                    └► Inventory LIBERA* ──► CANCELLED
                                                                                      └── shipment.created ──► CONFIRMED
 ```
 
 Ninguém comanda. Cada serviço reage a eventos e publica o que aconteceu no seu domínio.
+
+\* **Estorno/liberação (compensação) ainda não estão implementados** — ver "Estado
+atual" mais abaixo. Hoje esses dois ramos param em `COMPENSATING`, não em `CANCELLED`.
 
 ## O ponto do exercício
 
@@ -155,17 +158,26 @@ usar nenhum — o exemplo 03 mostra exatamente por quê.
 
 - [x] **Fase 0** — fundação: monorepo, contratos (11 eventos, 22 testes), infra local, 11 ADRs, C4 níveis 1 e 2
 - [x] **Material de estudo** — 10 módulos, simulador interativo, 6 exemplos executáveis
-- [ ] **Fase 1** — Order Service: HTTP + outbox
-- [ ] **Fase 2** — `packages/kafka` e `packages/idempotency`
-- [ ] **Fases 3–5** — Payment, Inventory, Shipping, Notification
+- [x] **Fase 1** — Order Service: HTTP + outbox + **projeção do estado da saga** (`order.status` avança de verdade até `CONFIRMED`/`CANCELLED`)
+- [x] **Fase 2** — `packages/kafka` e `packages/idempotency`
+- [x] **Fases 3–5** — Payment, Inventory, Shipping, Notification (caminho feliz e `payment.failed` completos, ponta a ponta, contra Kafka/Postgres reais)
+- [x] **Fase 9** — Docker de produção (5 imagens multi-stage, non-root, 0 CVE HIGH/CRITICAL, docker-compose integrado)
 - [ ] **Fase 6** — resiliência, caos, replay, `dlq-inspector`
 - [ ] **Fase 7** — observabilidade · **7b** — Saga Observer (a UI ligada ao sistema real)
 - [ ] **Fase 8** — C4 nível 3
-- [ ] **Fase 9** — Docker de produção · **Fase 10** — Kubernetes / Minikube
+- [ ] **Fase 10** — Kubernetes / Minikube
 - [ ] **Fase 11** — versão orquestrada, para comparação (opcional)
 
-Os padrões dos módulos 03 a 09 já rodam de verdade nos exemplos. O que falta é montá-los
-dentro dos cinco serviços, que é o que as Fases 1 a 5 do [plano](docs/PLAN.md) descrevem.
+**Limitação conhecida e deliberada:** a matriz de compensação (`payment.refunded`,
+`stock.released` — ver [módulo 08](docs/aprender/08-compensacao.md) e
+`COMPENSATION_MATRIX` em `packages/contracts/src/registry.ts`) ainda não está
+implementada em nenhum serviço. Um pedido que falha em `stock.unavailable` ou
+`shipment.failed` avança para `COMPENSATING` e **fica lá** — de propósito: fechar o
+pedido como `CANCELLED` sem a compensação ter de fato acontecido seria mentir no
+histórico do pedido. `payment.failed` (nada foi efetivado ainda) fecha normalmente em
+`CANCELLED`. Isso significa que hoje não há nada — humano ou automático — vigiando
+pedidos presos em `COMPENSATING`; é o próximo trabalho antes de a Fase 6 (DLQ/replay)
+fazer sentido.
 
 ---
 
