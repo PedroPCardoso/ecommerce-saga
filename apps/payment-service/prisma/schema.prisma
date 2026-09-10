@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PAYMENT_DATABASE_URL")
+}
+
+model Payment {
+  id                String   @id
+  orderId           String   @unique @map("order_id")
+  amountCents       Int      @map("amount_cents")
+  currency          String
+  status            String
+  authorizationCode String?  @map("authorization_code")
+  failureCode       String?  @map("failure_code")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("payments")
+}
+
+model Outbox {
+  id            BigInt    @id @default(autoincrement())
+  eventId       String    @unique @map("event_id")
+  aggregateId   String    @map("aggregate_id")
+  aggregateType String    @map("aggregate_type")
+  eventType     String    @map("event_type")
+  payload       Json
+  headers       Json      @default("{}")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  publishedAt   DateTime? @map("published_at")
+  attempts      Int       @default(0)
+
+  @@map("outbox")
+}
+
+model ProcessedMessage {
+  eventId       String   @map("event_id")
+  consumerGroup String   @map("consumer_group")
+  processedAt   DateTime @default(now()) @map("processed_at")
+
+  @@id([eventId, consumerGroup])
+  @@map("processed_messages")
+}
