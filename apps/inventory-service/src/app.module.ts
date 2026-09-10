@@ -1,0 +1,21 @@
+import { Module } from '@nestjs/common';
+import { HealthController } from './health/health.controller.js';
+import { PrismaService } from './infrastructure/prisma.service.js';
+import { OutboxRelayService } from './infrastructure/outbox-relay.service.js';
+import { InventoryConsumerService } from './infrastructure/inventory-consumer.service.js';
+import { OrderCreatedHandler } from './application/order-created.handler.js';
+import { PaymentApprovedHandler } from './application/payment-approved.handler.js';
+import { InventoryEventRouter } from './application/inventory-event.router.js';
+
+@Module({
+  controllers: [HealthController],
+  providers: [
+    PrismaService,
+    OutboxRelayService,
+    OrderCreatedHandler,
+    PaymentApprovedHandler,
+    InventoryEventRouter,
+    InventoryConsumerService,
+  ],
+})
+export class AppModule {}
