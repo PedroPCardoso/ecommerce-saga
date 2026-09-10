@@ -19,13 +19,17 @@
     "infra:nuke": "docker compose -f deploy/docker/docker-compose.yml down -v",
     "infra:logs": "docker compose -f deploy/docker/docker-compose.yml logs -f",
     "topics:create": "pnpm --filter @ecommerce/contracts build && node deploy/docker/scripts/create-topics.mjs",
-    "topics:list": "docker exec ecommerce-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list"
+    "topics:list": "docker exec ecommerce-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
     "@eslint/js": "^9.17.0",
     "@types/node": "^22.10.2",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
+    "husky": "^9.1.7",
     "kafkajs": "^2.2.4",
     "prettier": "^3.4.2",
     "turbo": "^2.3.3",
