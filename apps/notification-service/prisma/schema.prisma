@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+  // Output dedicado: sem isto, o client gerado vai para o local padrão
+  // `node_modules/@prisma/client`, que o pnpm resolve para a MESMA entrada
+  // física do store de conteúdo endereçável para todo pacote que dependa de
+  // `@prisma/client` na mesma versão — inclusive o Order Service e o Payment
+  // Service, que têm schemas diferentes. `prisma generate` aqui sobrescreveria
+  // o client de outro serviço (e vice-versa), quebrando o typecheck de um
+  // serviço sempre que outro rodasse `prisma generate` por último. `**/prisma/
+  // generated/` já está no .gitignore da raiz do monorepo — a convenção é
+  // isolar o client gerado por serviço.
+  output = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("NOTIFICATION_DATABASE_URL")
+}
+
+/// Aprendido via `order.created` — nenhum outro evento carrega customerId.
+model KnownOrder {
+  orderId    String   @id @map("order_id")
+  customerId String   @map("customer_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("known_orders")
+}
+
+model ProcessedMessage {
+  eventId       String   @map("event_id")
+  consumerGroup String   @map("consumer_group")
+  processedAt   DateTime @default(now()) @map("processed_at")
+
+  @@id([eventId, consumerGroup])
+  @@map("processed_messages")
+}
