@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+  // Output dedicado: sem isto, o client gerado vai para o local padrão
+  // `node_modules/@prisma/client`, que o pnpm resolve para a MESMA entrada
+  // física do store de conteúdo endereçável para todo pacote que dependa de
+  // `@prisma/client` na mesma versão — inclusive o Order Service e o Payment
+  // Service, que têm schemas diferentes. `prisma generate` aqui sobrescreveria
+  // o client de outro serviço (e vice-versa), quebrando o typecheck de um
+  // serviço sempre que outro rodasse `prisma generate` por último. `**/prisma/
+  // generated/` já está no .gitignore da raiz do monorepo — a convenção é
+  // isolar o client gerado por serviço.
+  output = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("SHIPPING_DATABASE_URL")
+}
+
+/// Aprendido via `order.created` — só o endereço, que `stock.reserved` não carrega.
+model KnownOrder {
+  orderId         String   @id @map("order_id")
+  shippingAddress Json     @map("shipping_address")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("known_orders")
+}
+
+model Shipment {
+  id                  String   @id
+  orderId             String   @unique @map("order_id")
+  carrier             String
+  trackingCode        String   @map("tracking_code")
+  labelUrl            String   @map("label_url")
+  estimatedDeliveryAt DateTime @map("estimated_delivery_at")
+  status              String   @default("CREATED")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@map("shipments")
+}
+
+model Outbox {
+  id            BigInt    @id @default(autoincrement())
+  eventId       String    @unique @map("event_id")
+  aggregateId   String    @map("aggregate_id")
+  aggregateType String    @map("aggregate_type")
+  eventType     String    @map("event_type")
+  payload       Json
+  headers       Json      @default("{}")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  publishedAt   DateTime? @map("published_at")
+  attempts      Int       @default(0)
+
+  @@map("outbox")
+}
+
+model ProcessedMessage {
+  eventId       String   @map("event_id")
+  consumerGroup String   @map("consumer_group")
+  processedAt   DateTime @default(now()) @map("processed_at")
+
+  @@id([eventId, consumerGroup])
+  @@map("processed_messages")
+}
