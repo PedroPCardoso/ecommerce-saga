@@ -15,7 +15,21 @@ export type ProjectionEventType =
 
 export type ProjectionResult =
   | { changed: true; next: OrderStatus }
-  | { changed: false; next: OrderStatus; reason: 'invalid-transition' };
+  /**
+   * O pedido já passou deste ponto (reentrega tardia, ou evento superado por
+   * um evento mais recente que chegou primeiro) — seguro ignorar e commitar.
+   */
+  | { changed: false; next: OrderStatus; reason: 'stale' }
+  /**
+   * O pedido AINDA NÃO chegou ao estado que este evento exige — a mesma
+   * corrida legítima entre tópicos diferentes que Inventory/Shipping já
+   * tratam (ex.: payment.approved-handler.ts, stock-reserved.handler.ts):
+   * nada garante ordem ENTRE `ecommerce.payments.v1`, `ecommerce.inventory.v1`
+   * e `ecommerce.shipping.v1`, e o consumidor único deste projetor os lê
+   * concorrentemente. O chamador DEVE tratar isto como retriável (nunca como
+   * "ignora e segue"), ou o evento se perde para sempre.
+   */
+  | { changed: false; next: OrderStatus; reason: 'premature' };
 
 /**
  * Tabela de transição: `[estado-de-origem, evento] -> próximo estado`.
@@ -46,19 +60,43 @@ const TRANSITIONS: Record<OrderStatus, Partial<Record<ProjectionEventType, Order
   [ORDER_STATUS.CANCELLED]: {},
 };
 
+/** Posição de cada evento na linha do tempo da saga — o estado de ORIGEM que ele exige. */
+const REQUIRED_SOURCE_RANK: Record<ProjectionEventType, number> = {
+  'payment.approved': 0,
+  'payment.failed': 0,
+  'stock.reserved': 1,
+  'stock.unavailable': 1,
+  'shipment.created': 2,
+  'shipment.failed': 2,
+};
+
+/** Posição de cada estado do pedido na mesma linha do tempo. */
+const STATUS_RANK: Record<OrderStatus, number> = {
+  [ORDER_STATUS.PENDING]: 0,
+  [ORDER_STATUS.PAYMENT_APPROVED]: 1,
+  [ORDER_STATUS.STOCK_RESERVED]: 2,
+  [ORDER_STATUS.COMPENSATING]: 3,
+  [ORDER_STATUS.CONFIRMED]: 3,
+  [ORDER_STATUS.CANCELLED]: 3,
+};
+
 /**
  * Regra de ouro (docs/PLAN.md §1): a transição é monotônica e idempotente.
- * Nunca lança — evento fora de ordem ou reentrega é dado do dia a dia da
- * coreografia, não uma exceção. O chamador decide o que fazer com
- * `reason: 'invalid-transition'` (tipicamente: logar em WARN e não tocar
- * no agregado).
+ * Nunca lança — quem decide o que fazer com uma transição inválida é o
+ * chamador, a partir do `reason`. A distinção `stale` vs. `premature` é o
+ * que evita repetir, aqui, o próprio bug que este projetor existe para
+ * corrigir (C2 da revisão final): tratar TODA transição inválida como
+ * "ignora e commita" perderia para sempre um evento que só chegou cedo
+ * demais, e o pedido ficaria preso não mais em PENDING, mas num estado
+ * intermediário qualquer — mesmo destino, porta diferente.
  */
 export function applyEvent(current: OrderStatus, eventType: ProjectionEventType): ProjectionResult {
   const next = TRANSITIONS[current]?.[eventType];
 
-  if (!next) {
-    return { changed: false, next: current, reason: 'invalid-transition' };
+  if (next) {
+    return { changed: true, next };
   }
 
-  return { changed: true, next };
+  const reason = STATUS_RANK[current] < REQUIRED_SOURCE_RANK[eventType] ? 'premature' : 'stale';
+  return { changed: false, next: current, reason };
 }

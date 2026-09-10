@@ -107,11 +107,19 @@ export class KafkaConsumerRuntime {
 
     try {
       await this.handler({ envelope });
-      await commit();
     } catch (error) {
       await this.route(topic, partition, message, error, 0);
       await commit();
+      return;
     }
+
+    // O handler teve SUCESSO: uma falha aqui é problema de infraestrutura do commit em
+    // si (conexão caiu, coordinator trocou), não do processamento — não pode ser
+    // reclassificada como falha de handler e desviada para retry/DLT, ou uma mensagem
+    // já efetivada seria republicada. Deixa propagar: o offset não avança, o kafkajs
+    // reentrega esta mesma mensagem, e reprocessar é seguro porque o handler é
+    // idempotente (markProcessed).
+    await commit();
   }
 
   /** Processa uma mensagem que chegou a um degrau da escada de retry. Comita no PRÓPRIO tópico de retry (onde a mensagem está), não no tópico de origem. */
@@ -146,11 +154,15 @@ export class KafkaConsumerRuntime {
 
     try {
       await this.handler({ envelope });
-      await commit();
     } catch (error) {
       await this.route(sourceTopic, partition, message, error, attempt + 1);
       await commit();
+      return;
     }
+
+    // Mesmo raciocínio de processMainMessage: sucesso do handler + falha do commit não
+    // é falha de processamento — deixa propagar em vez de desviar para o próximo degrau.
+    await commit();
   }
 
   private parse(value: Buffer | null): UnknownEnvelope {

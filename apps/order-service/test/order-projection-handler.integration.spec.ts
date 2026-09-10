@@ -214,15 +214,52 @@ describe('OrderProjectionHandler (integração — Postgres real, requer pnpm in
     expect(order.status).toBe('PAYMENT_APPROVED');
   });
 
-  it('evento fora de ordem (stock.reserved antes de payment.approved) é ignorado com WARN, sem quebrar nem regredir o pedido', async () => {
+  it('RACE CONDITION — stock.reserved chega ANTES de payment.approved: falha retriável sem deixar rastro; ao chegar payment.approved, o retry aplica normalmente', async () => {
+    const orderId = await createTestOrder();
+    const stockEnvelope = makeStockReserved(orderId);
+
+    // 1) stock.reserved processado primeiro — o pedido ainda está em PENDING, não em
+    //    PAYMENT_APPROVED (estado que este evento exige).
+    await expect(handler.handle(stockEnvelope)).rejects.toThrow(/ainda não chegou/);
+
+    // 2) A transação inteira foi desfeita — INCLUSIVE o markProcessed. Sem este rollback,
+    //    a "retentativa" abaixo encontraria o par (eventId, consumerGroup) já marcado e
+    //    devolveria silenciosamente sem nunca ter aplicado a transição.
+    const processed = await prisma.client.processedMessage.findUnique({
+      where: {
+        eventId_consumerGroup: {
+          eventId: stockEnvelope.eventId,
+          consumerGroup: 'order-projection',
+        },
+      },
+    });
+    expect(processed).toBeNull();
+    const orderBefore = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(orderBefore.status).toBe('PENDING');
+
+    // 3) payment.approved finalmente chega (fora de ordem entre tópicos diferentes).
+    await handler.handle(makePaymentApproved(orderId));
+
+    // 4) "Retentativa": mesmo handler, mesmo evento — é exatamente o que a escada de
+    //    retry (5s/1m/10m) do @ecommerce/kafka faria ao redeliverar a mensagem.
+    await handler.handle(stockEnvelope);
+
+    const orderAfter = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(orderAfter.status).toBe('STOCK_RESERVED');
+  });
+
+  it('evento OBSOLETO (stale) — payment.approved reentregue com eventId novo depois de o pedido já estar em STOCK_RESERVED — é ignorado com WARN, sem regredir nem lançar', async () => {
     const orderId = await createTestOrder();
 
+    await handler.handle(makePaymentApproved(orderId));
     await handler.handle(makeStockReserved(orderId));
 
-    const order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
-    expect(order.status).toBe('PENDING');
+    // eventId novo (não é reentrega do mesmo evento — markProcessed não pega isto),
+    // mas o pedido já passou de PAYMENT_APPROVED: a REGRA DE OURO precisa rejeitar
+    // sem lançar, porque não há nada "anterior" para esperar aqui.
+    await handler.handle(makePaymentApproved(orderId));
 
-    const outboxRows = await prisma.client.outbox.findMany({ where: { aggregateId: orderId } });
-    expect(outboxRows).toHaveLength(0);
+    const order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('STOCK_RESERVED');
   });
 });

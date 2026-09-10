@@ -80,18 +80,59 @@ export class OrderProjectionHandler {
       const result = applyEvent(currentStatus, eventType);
 
       if (!result.changed) {
-        // Evento fora de ordem entre tópicos diferentes ou já superado por um evento
-        // posterior (ex.: stock.reserved chegando depois de shipment.created reordenado
-        // por retry) — regra de ouro (docs/PLAN.md §1): rejeita silenciosamente, com WARN.
+        if (result.reason === 'premature') {
+          // O pedido AINDA NÃO chegou ao estado que este evento exige — a mesma corrida
+          // legítima entre tópicos diferentes que Inventory/Shipping já tratam
+          // (payment-approved.handler.ts, stock-reserved.handler.ts): nada garante ordem
+          // ENTRE ecommerce.payments.v1/inventory.v1/shipping.v1. Por isso este `throw`
+          // acontece DENTRO da transação, DEPOIS do markProcessed acima: o Prisma faz
+          // ROLLBACK de tudo, inclusive do registro de idempotência. Sem esse rollback, a
+          // escada de retry encontraria o (eventId, consumerGroup) já marcado e desistiria
+          // silenciosamente — exatamente o bug que este projetor existe para corrigir (C2),
+          // só que pela porta do "invalid-transition" em vez de "nenhum consumidor".
+          //
+          // Erro sem `.permanent = true` -> classifyError (@ecommerce/kafka) classifica
+          // como RETRIÁVEL por padrão -> a escada 5s/1m/10m dá tempo do evento anterior
+          // chegar.
+          throw new Error(
+            `Pedido ${orderId} ainda não chegou ao estado exigido por ${eventType} (está em ${currentStatus}) — aguardando evento anterior da saga`,
+          );
+        }
+
+        // 'stale': o pedido já passou deste ponto (reentrega tardia, ou evento superado por
+        // um mais recente que chegou primeiro) — regra de ouro (docs/PLAN.md §1): rejeita
+        // silenciosamente, com WARN. Seguro commitar aqui: não há efeito pendente.
         this.logger.warn(
-          `Transição inválida ignorada: pedido ${orderId} em ${currentStatus}, evento ${eventType}`,
+          `Transição obsoleta ignorada: pedido ${orderId} em ${currentStatus}, evento ${eventType}`,
         );
         return;
       }
 
-      await tx.order.update({ where: { id: orderId }, data: { status: result.next } });
+      // Guarda contra lost update: duas partições diferentes (ex.: payments e shipping)
+      // podem estar sendo processadas ao mesmo tempo por réplicas diferentes deste
+      // consumer group. O `where: { status: currentStatus }` faz o UPDATE falhar
+      // (count 0) se outra transação já mudou o status entre nosso SELECT e este UPDATE,
+      // em vez de sobrescrever silenciosamente uma transição concorrente.
+      const updated = await tx.order.updateMany({
+        where: { id: orderId, status: currentStatus },
+        data: { status: result.next },
+      });
+      if (updated.count === 0) {
+        throw new Error(
+          `Pedido ${orderId} mudou de status concorrentemente enquanto projetava ${eventType} — retentando`,
+        );
+      }
 
-      if (result.next === ORDER_STATUS.CONFIRMED) {
+      if (result.next === ORDER_STATUS.COMPENSATING) {
+        // Nada observa hoje um pedido preso em COMPENSATING (a matriz de compensação — I4 —
+        // ainda não publica payment.refunded/stock.released para destravá-lo). Sem este
+        // log, um pagamento capturado e nunca estornado não deixa rastro em lugar nenhum
+        // (OWASP A09) até alguém notar "faltando" numa auditoria manual.
+        this.logger.error(
+          `Pedido ${orderId} entrou em COMPENSATING via ${eventType} e vai FICAR PRESO aqui — ` +
+            `compensação (payment.refunded/stock.released) ainda não implementada. Ação manual necessária.`,
+        );
+      } else if (result.next === ORDER_STATUS.CONFIRMED) {
         const confirmedEnvelope = createEvent(orderEvents.orderConfirmed, {
           aggregateId: order.id,
           correlationId: envelope.correlationId,

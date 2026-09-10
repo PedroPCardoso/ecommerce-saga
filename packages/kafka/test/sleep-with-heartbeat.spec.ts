@@ -56,4 +56,20 @@ describe('sleepWithHeartbeat', () => {
     // Passos: 3s (heartbeat 1) + 2s restante (heartbeat 2) = dorme os 5s certinhos.
     expect(heartbeat).toHaveBeenCalledTimes(2);
   });
+
+  it('um heartbeat que rejeita (ex.: rebalance em andamento) não aborta o degrau — continua dormindo e chamando heartbeat nos passos seguintes', async () => {
+    const heartbeat = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('The group is rebalancing, re-joining'))
+      .mockResolvedValue(undefined);
+
+    const promise = sleepWithHeartbeat(15_000, heartbeat, 3_000);
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    // Não lança: o catch interno de sleepWithHeartbeat engole a falha isolada e o
+    // degrau inteiro termina os 15s normalmente.
+    await expect(promise).resolves.toBeUndefined();
+    expect(heartbeat).toHaveBeenCalledTimes(5); // 15_000 / 3_000, nenhuma chamada pulada
+  });
 });

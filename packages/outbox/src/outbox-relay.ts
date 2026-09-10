@@ -124,9 +124,18 @@ export class OutboxRelay {
       }
 
       await client.query('COMMIT');
-      return rows.length;
+      // published.length, não rows.length: se TODAS as publicações desta passada
+      // falharam (broker fora do ar), devolver rows.length faria loop() enxergar
+      // "processei algo" e nunca dormir entre tentativas — busy-loop batendo em
+      // Postgres e no broker a cada volta, sem nenhum backoff.
+      return published.length;
     } catch (error) {
-      await client.query('ROLLBACK');
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // Conexão já pode estar morta (é por isso que o BEGIN/SELECT/UPDATE de cima
+        // falhou) — o ROLLBACK em si falhar não pode mascarar o erro original abaixo.
+      }
       throw error;
     } finally {
       client.release();

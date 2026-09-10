@@ -29,43 +29,52 @@ describe('OrderStateMachine.applyEvent', () => {
     expect(result).toEqual({ changed: true, next: ORDER_STATUS.COMPENSATING });
   });
 
-  it('rejeita silenciosamente evento fora de ordem — stock.reserved chegando antes de payment.approved', () => {
+  it('evento PREMATURO — stock.reserved chegando antes de payment.approved — é retriável, não silenciosamente descartado', () => {
     const result = applyEvent(ORDER_STATUS.PENDING, 'stock.reserved');
     expect(result).toEqual({
       changed: false,
       next: ORDER_STATUS.PENDING,
-      reason: 'invalid-transition',
+      reason: 'premature',
     });
   });
 
-  it('rejeita silenciosamente reentrega tardia de payment.approved quando o pedido já avançou', () => {
+  it('evento PREMATURO — shipment.created chegando antes de stock.reserved (pedido ainda em PAYMENT_APPROVED)', () => {
+    const result = applyEvent(ORDER_STATUS.PAYMENT_APPROVED, 'shipment.created');
+    expect(result).toEqual({
+      changed: false,
+      next: ORDER_STATUS.PAYMENT_APPROVED,
+      reason: 'premature',
+    });
+  });
+
+  it('evento OBSOLETO (stale) — reentrega tardia de payment.approved quando o pedido já avançou — seguro ignorar', () => {
     const result = applyEvent(ORDER_STATUS.STOCK_RESERVED, 'payment.approved');
     expect(result).toEqual({
       changed: false,
       next: ORDER_STATUS.STOCK_RESERVED,
-      reason: 'invalid-transition',
+      reason: 'stale',
     });
   });
 
-  it('estados terminais (CONFIRMED, CANCELLED) não aceitam nenhuma transição — idempotência final', () => {
+  it('estados terminais (CONFIRMED, CANCELLED) não aceitam nenhuma transição — sempre stale, nunca retriável', () => {
     expect(applyEvent(ORDER_STATUS.CONFIRMED, 'shipment.created')).toEqual({
       changed: false,
       next: ORDER_STATUS.CONFIRMED,
-      reason: 'invalid-transition',
+      reason: 'stale',
     });
     expect(applyEvent(ORDER_STATUS.CANCELLED, 'payment.approved')).toEqual({
       changed: false,
       next: ORDER_STATUS.CANCELLED,
-      reason: 'invalid-transition',
+      reason: 'stale',
     });
   });
 
-  it('COMPENSATING não aceita nenhuma transição direta enquanto I4 (compensação) não existir', () => {
+  it('COMPENSATING não aceita nenhuma transição direta enquanto I4 (compensação) não existir — stale, não retriável', () => {
     const result = applyEvent(ORDER_STATUS.COMPENSATING, 'shipment.created');
     expect(result).toEqual({
       changed: false,
       next: ORDER_STATUS.COMPENSATING,
-      reason: 'invalid-transition',
+      reason: 'stale',
     });
   });
 });
