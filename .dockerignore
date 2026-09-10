@@ -18,6 +18,13 @@ coverage
 **/coverage
 *.tsbuildinfo
 
+# Prisma Client gerado localmente no host (ex.: macOS/arm64) — o binário do
+# query engine é específico da plataforma. Sem esta linha, `COPY . .` levaria
+# esse binário "darwin-arm64" para dentro da imagem Linux, onde é morto e só
+# ocupa espaço; o estágio `build` do Dockerfile já roda `prisma generate` de
+# dentro do container, gerando o client correto para o runtime de verdade.
+**/prisma/generated
+
 # Controle de versão e editor.
 .git
 .gitignore
