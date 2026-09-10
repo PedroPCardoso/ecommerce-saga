@@ -1,0 +1,36 @@
+# Segredo — NUNCA deve entrar no contexto de build (COPY . . copia tudo que
+# não estiver aqui; sem esta linha, .env do host vazaria para dentro da imagem).
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Dependências e build — reconstruídos dentro do container, não copiados do host.
+node_modules
+**/node_modules
+dist
+**/dist
+.turbo
+**/.turbo
+coverage
+**/coverage
+*.tsbuildinfo
+
+# Controle de versão e editor.
+.git
+.gitignore
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Nada disto é necessário dentro da imagem de runtime.
+docs
+examples
+tools
+deploy/k8s
+deploy/helm
+.playwright-mcp
+*.log
