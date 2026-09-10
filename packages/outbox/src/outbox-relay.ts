@@ -55,8 +55,21 @@ export class OutboxRelay {
 
   private async loop(): Promise<void> {
     while (this.running) {
-      const processed = await this.drainOnce();
-      if (processed === 0) {
+      try {
+        const processed = await this.drainOnce();
+        if (processed === 0) {
+          await sleep(this.pollIntervalMs);
+        }
+      } catch (error) {
+        // Erro de infra (conexão derrubada, deadlock, Postgres reiniciando)
+        // não pode escapar do loop: sem este catch, a promise de `start()`
+        // rejeita sem que ninguém a aguarde (ninguém chama `await` nela até
+        // `stop()`), vira unhandled rejection, e o Node mata o processo —
+        // o relay inteiro para de publicar até o container reiniciar.
+        // Aqui, o mesmo `onError` de falha de publish trata isso, e o loop
+        // espera um ciclo antes de tentar de novo (evita busy-loop se a
+        // conexão estiver mesmo fora do ar).
+        this.onError(error, { id: '(loop)', eventId: '(loop)', envelope: null, headers: {} });
         await sleep(this.pollIntervalMs);
       }
     }

@@ -121,7 +121,16 @@ export class KafkaConsumerRuntime {
     attempt: number,
     payload: EachMessagePayload,
   ): Promise<void> {
-    await sleep(RETRY_LADDER[attempt]!.delayMs);
+    // Degraus de 1m/10m excedem o sessionTimeout (30s): um único `sleep`
+    // bloqueando o `eachMessage` inteiro nunca dá chance ao kafkajs de mandar
+    // heartbeat (isso só acontece ENTRE mensagens, não durante uma). Sem
+    // heartbeat o coordinator expulsa o membro do grupo antes do delay
+    // terminar, o commit seguinte falha, e a mensagem nunca avança —
+    // trava naquele degrau para sempre em vez de escalar ou cair na DLT.
+    // `payload.heartbeat()` é a única forma de manter o membro vivo durante
+    // um processamento longo; chamamos a cada poucos segundos, nunca mais
+    // espaçado que `heartbeatInterval` (3s, config do produtor/consumidor).
+    await sleepWithHeartbeat(RETRY_LADDER[attempt]!.delayMs, payload.heartbeat);
     const { topic, partition, message } = payload;
     const commit = () =>
       consumer.commitOffsets([{ topic, partition, offset: String(Number(message.offset) + 1) }]);
@@ -175,11 +184,13 @@ export class KafkaConsumerRuntime {
       consumerGroup: this.groupId,
     });
 
-    await this.producer.publishRaw(
-      retryTopic(sourceTopic, this.groupId, retryCount),
-      message.value,
-      headers,
-      message.key,
+    const nextTopic = retryTopic(sourceTopic, this.groupId, retryCount);
+    await this.producer.publishRaw(nextTopic, message.value, headers, message.key);
+    // Nunca logar o payload (pode carregar PII, A09) — só metadados de
+    // roteamento. Sem isto, uma mensagem desviada não deixa rastro nenhum em
+    // lugar algum (docs/PLAN.md armadilha #8: DLQ/retry vira cemitério).
+    console.warn(
+      `[kafka] ${sourceTopic} → ${nextTopic} (grupo=${this.groupId}, tentativa=${retryCount + 1}, erro=${errorMessageOf(error)})`,
     );
   }
 
@@ -200,13 +211,16 @@ export class KafkaConsumerRuntime {
       consumerGroup: this.groupId,
     });
 
-    await this.producer.publishRaw(
-      deadLetterTopic(sourceTopic, this.groupId),
-      message.value,
-      headers,
-      message.key,
+    const dlt = deadLetterTopic(sourceTopic, this.groupId);
+    await this.producer.publishRaw(dlt, message.value, headers, message.key);
+    console.error(
+      `[kafka] ${sourceTopic} → DLT ${dlt} (grupo=${this.groupId}, tentativas=${retryCount}, erro=${errorMessageOf(error)})`,
     );
   }
+}
+
+function errorMessageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function firstFailureAt(message: KafkaMessage, retryCount: number): string {
@@ -217,4 +231,33 @@ function firstFailureAt(message: KafkaMessage, retryCount: number): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Dorme `totalMs`, mas chama `heartbeat()` a cada `intervalMs` (bem abaixo do
+ * `sessionTimeout` de 30s) para o kafkajs não expulsar o consumidor do grupo
+ * enquanto o degrau de retry espera. Ver comentário em `processRetryMessage`.
+ */
+export async function sleepWithHeartbeat(
+  totalMs: number,
+  heartbeat: () => Promise<void>,
+  intervalMs = 3_000,
+): Promise<void> {
+  let remaining = totalMs;
+  while (remaining > 0) {
+    const step = Math.min(intervalMs, remaining);
+    await sleep(step);
+    remaining -= step;
+    try {
+      await heartbeat();
+    } catch {
+      // Um heartbeat isolado falhando (ex.: rebalance em andamento) não pode
+      // abortar o degrau inteiro sem passar pelo try/catch de
+      // parse+handler — se o grupo realmente expulsou o membro, o próximo
+      // `commitOffsets` vai falhar por conta própria e isso já é tratado
+      // (a mensagem é reprocessada na próxima passada do consumer). Deixar
+      // esta exceção subir aqui só trocaria uma falha tratável por uma
+      // não-tratada no meio do sleep.
+    }
+  }
 }
