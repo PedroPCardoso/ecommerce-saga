@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
-    "test": "vitest run",
+    "test": "dotenv -e ../../.env -- vitest run",
     "dev": "dotenv -e ../../.env -- tsx watch src/main.ts",
     "start": "dotenv -e ../../.env -- node dist/main.js",
     "prisma:generate": "dotenv -e ../../.env -- prisma generate",
