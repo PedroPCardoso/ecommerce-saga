@@ -7,8 +7,11 @@ export default defineConfig({
     environment: 'node',
     testTimeout: 20_000,
     // Os specs de integração/e2e sobem consumidores e produtores Kafka reais
-    // contra o mesmo broker; rodar os arquivos em paralelo causa contenção
-    // (rebalance mais lento) e timeouts intermitentes no teste do relay.
+    // contra o mesmo broker; rodar os arquivos em paralelo faz múltiplos
+    // processos Node abrirem conexões/produtores/consumidores concorrentes
+    // contra o mesmo broker local, gerando contenção de recursos/conexão e
+    // timeouts intermitentes no teste do relay (não é rebalanceamento de
+    // consumer group — o OutboxRelayService só produz para o Kafka).
     fileParallelism: false,
   },
   plugins: [

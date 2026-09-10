@@ -28,7 +28,7 @@ export class JwtAuthGuard implements CanActivate {
     const token = header.slice('Bearer '.length);
     let payload: unknown;
     try {
-      payload = jwt.verify(token, env.JWT_SECRET, { issuer: env.JWT_ISSUER });
+      payload = jwt.verify(token, env.JWT_SECRET, { issuer: env.JWT_ISSUER, algorithms: ['HS256'] });
     } catch {
       throw new UnauthorizedException('Token inválido ou expirado');
     }
