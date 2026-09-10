@@ -1,0 +1,43 @@
+# --- Segredos: NUNCA commitar ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+.secrets/
+*-secret.yaml
+!*-sealedsecret.yaml
+
+# --- Dependências e build ---
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+.turbo/
+
+# --- Testes e cobertura ---
+coverage/
+.nyc_output/
+
+# --- Prisma ---
+**/prisma/generated/
+**/prisma/*.db
+
+# --- Editores e SO ---
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# --- Structurizr: gerados em runtime a partir do workspace.dsl ---
+docs/architecture/.structurizr/
+docs/architecture/workspace.json
+
+# --- Logs e runtime local ---
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.docker-data/

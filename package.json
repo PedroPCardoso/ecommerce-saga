@@ -1,0 +1,36 @@
+{
+  "name": "ecommerce-saga",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "format": "prettier --write \"**/*.{ts,js,json,md,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{ts,js,json,md,yaml,yml}\"",
+    "infra:up": "docker compose -f deploy/docker/docker-compose.yml up -d",
+    "infra:down": "docker compose -f deploy/docker/docker-compose.yml down",
+    "infra:nuke": "docker compose -f deploy/docker/docker-compose.yml down -v",
+    "infra:logs": "docker compose -f deploy/docker/docker-compose.yml logs -f",
+    "topics:create": "pnpm --filter @ecommerce/contracts build && node deploy/docker/scripts/create-topics.mjs",
+    "topics:list": "docker exec ecommerce-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "kafkajs": "^2.2.4",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "vitest": "^2.1.8"
+  }
+}

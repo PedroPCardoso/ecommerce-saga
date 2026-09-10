@@ -1,0 +1,1764 @@
+<meta charset="utf-8">
+<title>Console da Saga Coreografada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* ─────────────────────────────────────────────────────────────────────────
+     Tokens. Neutros de slate com viés levemente ciano, alinhado ao acento.
+     Cores semânticas (ok/warn/crit/comp) são separadas do acento estrutural.
+     ───────────────────────────────────────────────────────────────────────── */
+  :root {
+    color-scheme: light dark;
+
+    --ground: #E7EBEC;
+    --panel: #FFFFFF;
+    --panel-2: #F1F4F5;
+    --panel-3: #E4E9EB;
+    --ink: #14202A;
+    --ink-2: #495D69;
+    --ink-3: #798A95;
+    --rule: #D1D9DC;
+    --rule-2: #B4C0C6;
+
+    --accent: #0A6E77;
+    --accent-soft: #D3E8EA;
+    --accent-ink: #06484F;
+
+    --ok: #1B7A45;      --ok-soft: #D5EADC;
+    --warn: #A06207;    --warn-soft: #F6E7CC;
+    --crit: #AE3227;    --crit-soft: #F6DAD6;
+    --comp: #5C40A0;    --comp-soft: #E1DBF3;
+
+    --shadow: 0 1px 2px rgba(20,32,42,.07), 0 10px 28px -14px rgba(20,32,42,.22);
+
+    --font-ui: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-cond: 'IBM Plex Sans Condensed', 'IBM Plex Sans', ui-sans-serif, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+    --r: 4px;
+    --r-lg: 8px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1418;
+      --panel: #151E24;
+      --panel-2: #1C262D;
+      --panel-3: #232F37;
+      --ink: #DCE5E9;
+      --ink-2: #9BADB7;
+      --ink-3: #6B7F8A;
+      --rule: #26323A;
+      --rule-2: #3A4A54;
+
+      --accent: #33AEB8;
+      --accent-soft: #10353A;
+      --accent-ink: #7FD4DB;
+
+      --ok: #45B776;      --ok-soft: #10301E;
+      --warn: #DDA043;    --warn-soft: #32250E;
+      --crit: #E36A5C;    --crit-soft: #361815;
+      --comp: #A186DF;    --comp-soft: #221A38;
+
+      --shadow: 0 1px 2px rgba(0,0,0,.45), 0 10px 28px -14px rgba(0,0,0,.7);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0D1418;
+    --panel: #151E24;
+    --panel-2: #1C262D;
+    --panel-3: #232F37;
+    --ink: #DCE5E9;
+    --ink-2: #9BADB7;
+    --ink-3: #6B7F8A;
+    --rule: #26323A;
+    --rule-2: #3A4A54;
+
+    --accent: #33AEB8;
+    --accent-soft: #10353A;
+    --accent-ink: #7FD4DB;
+
+    --ok: #45B776;      --ok-soft: #10301E;
+    --warn: #DDA043;    --warn-soft: #32250E;
+    --crit: #E36A5C;    --crit-soft: #361815;
+    --comp: #A186DF;    --comp-soft: #221A38;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.45), 0 10px 28px -14px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1480px; margin: 0 auto; padding: 28px 20px 72px; }
+
+  /* ── cabeçalho ─────────────────────────────────────────────────────────── */
+  header.top {
+    display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+    gap: 20px; padding-bottom: 18px; margin-bottom: 20px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .brand { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .eyebrow {
+    font-family: var(--font-cond); font-weight: 600; font-size: 11px;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    margin: 0; font-size: clamp(22px, 3vw, 31px); font-weight: 600;
+    letter-spacing: -.02em; text-wrap: balance;
+  }
+  .sub { margin: 0; color: var(--ink-2); max-width: 62ch; font-size: 14px; }
+
+  /* ── controles de transporte ───────────────────────────────────────────── */
+  .transport { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  button {
+    font-family: var(--font-ui); font-size: 13px; font-weight: 500;
+    color: var(--ink); background: var(--panel); border: 1px solid var(--rule-2);
+    border-radius: var(--r); padding: 7px 12px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: background .12s, border-color .12s, color .12s;
+  }
+  button:hover:not(:disabled) { background: var(--panel-2); border-color: var(--ink-3); }
+  button:disabled { opacity: .42; cursor: not-allowed; }
+  button:focus-visible, [tabindex]:focus-visible, .tab:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  button.primary {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+  }
+  :root[data-theme="dark"] button.primary { color: #062225; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) button.primary { color: #062225; }
+  }
+  button.primary:hover:not(:disabled) { filter: brightness(1.08); }
+  .seg { display: inline-flex; border: 1px solid var(--rule-2); border-radius: var(--r); overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 7px 11px; background: var(--panel); }
+  .seg button + button { border-left: 1px solid var(--rule); }
+  .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+
+  /* ── grade do console ──────────────────────────────────────────────────── */
+  .console {
+    display: grid; grid-template-columns: 292px minmax(0, 1fr) 356px;
+    gap: 16px; align-items: start;
+  }
+  @media (max-width: 1240px) { .console { grid-template-columns: 280px minmax(0,1fr); } }
+  @media (max-width: 900px)  { .console { grid-template-columns: minmax(0,1fr); } }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--rule);
+    border-radius: var(--r-lg); box-shadow: var(--shadow);
+  }
+  .panel > h2, .panel > .phead {
+    margin: 0; padding: 11px 14px; border-bottom: 1px solid var(--rule);
+    font-family: var(--font-cond); font-size: 11.5px; font-weight: 600;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .pbody { padding: 12px 14px; }
+  .pbody.flush { padding: 0; }
+
+  /* ── lançador de cenários ──────────────────────────────────────────────── */
+  .group-label {
+    font-family: var(--font-cond); font-size: 10.5px; font-weight: 600;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3);
+    margin: 14px 0 7px;
+  }
+  .group-label:first-child { margin-top: 0; }
+  .scen {
+    display: block; width: 100%; text-align: left; margin-bottom: 6px;
+    padding: 9px 11px; line-height: 1.35; border-left-width: 3px;
+  }
+  .scen .sn { display: block; font-weight: 600; font-size: 13px; }
+  .scen .sd {
+    display: block; font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--ink-3); margin-top: 3px; word-break: break-word;
+  }
+  .scen[data-tone="ok"]   { border-left-color: var(--ok); }
+  .scen[data-tone="crit"] { border-left-color: var(--crit); }
+  .scen[data-tone="comp"] { border-left-color: var(--comp); }
+  .scen[data-tone="warn"] { border-left-color: var(--warn); }
+  .scen[aria-current="true"] { background: var(--accent-soft); border-color: var(--accent); }
+
+  /* ── topologia ─────────────────────────────────────────────────────────── */
+  .topo-wrap { overflow-x: auto; padding: 6px 4px 2px; }
+  svg.topo { display: block; width: 100%; min-width: 780px; height: auto; }
+
+  .node-box { fill: var(--panel-2); stroke: var(--rule-2); stroke-width: 1; }
+  .node-box.act { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6; }
+  .node-name { font-family: var(--font-ui); font-size: 12.5px; font-weight: 600; fill: var(--ink); }
+  .node-meta { font-family: var(--font-mono); font-size: 9.5px; fill: var(--ink-3); }
+  .band { font-family: var(--font-cond); font-size: 9.5px; font-weight: 600; letter-spacing: .13em; fill: var(--ink-3); }
+  .rail { stroke: var(--rule-2); stroke-width: 3; stroke-linecap: round; }
+  .rail.hot { stroke: var(--accent); }
+  .topic-name { font-family: var(--font-mono); font-size: 10px; fill: var(--ink-2); }
+  .edge { stroke: var(--rule); color: var(--rule); stroke-width: 1.2; fill: none; }
+  .edge.hot { stroke: var(--accent); color: var(--accent); stroke-width: 1.8; }
+  .lag-chip { font-family: var(--font-mono); font-size: 9px; font-weight: 600; }
+
+  /* ── linha do tempo ────────────────────────────────────────────────────── */
+  .tl { max-height: 460px; overflow-y: auto; overflow-x: hidden; }
+  .tl-row {
+    display: grid; grid-template-columns: 52px 128px 1fr; gap: 10px;
+    padding: 6px 14px; border-bottom: 1px solid var(--rule);
+    font-size: 12.5px; cursor: pointer; align-items: baseline;
+  }
+  .tl-row:hover { background: var(--panel-2); }
+  .tl-row[aria-current="true"] { background: var(--accent-soft); }
+  .tl-t { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .tl-who { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tl-what { min-width: 0; }
+  .tl-what code { font-family: var(--font-mono); font-size: 11px; background: var(--panel-3); padding: 1px 4px; border-radius: 3px; }
+  .tl-row .kind {
+    display: inline-block; font-family: var(--font-cond); font-size: 9.5px; font-weight: 700;
+    letter-spacing: .09em; text-transform: uppercase; padding: 1px 5px; border-radius: 3px;
+    margin-right: 7px; vertical-align: 1px;
+  }
+  .k-http { background: var(--panel-3); color: var(--ink-2); }
+  .k-tx { background: var(--accent-soft); color: var(--accent-ink); }
+  .k-outbox { background: var(--accent-soft); color: var(--accent-ink); }
+  .k-produce { background: var(--ok-soft); color: var(--ok); }
+  .k-poll { background: var(--panel-3); color: var(--ink-2); }
+  .k-effect { background: var(--ok-soft); color: var(--ok); }
+  .k-commit { background: var(--ok-soft); color: var(--ok); }
+  .k-skip { background: var(--warn-soft); color: var(--warn); }
+  .k-error { background: var(--crit-soft); color: var(--crit); }
+  .k-retry { background: var(--warn-soft); color: var(--warn); }
+  .k-dlt { background: var(--crit-soft); color: var(--crit); }
+  .k-comp { background: var(--comp-soft); color: var(--comp); }
+  .k-state { background: var(--accent-soft); color: var(--accent-ink); }
+
+  .empty { padding: 22px 14px; color: var(--ink-3); font-size: 13px; }
+
+  /* ── inspetores ────────────────────────────────────────────────────────── */
+  .tabs { display: flex; border-bottom: 1px solid var(--rule); overflow-x: auto; }
+  .tab {
+    flex: 0 0 auto; background: none; border: 0; border-bottom: 2px solid transparent;
+    border-radius: 0; padding: 9px 11px; font-family: var(--font-cond);
+    font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-3); cursor: pointer; white-space: nowrap;
+  }
+  .tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab .badge {
+    font-family: var(--font-mono); font-size: 9.5px; margin-left: 5px;
+    background: var(--panel-3); color: var(--ink-2); padding: 0 4px; border-radius: 3px;
+  }
+  .tab[data-tone="crit"] .badge { background: var(--crit-soft); color: var(--crit); }
+  .tab[data-tone="warn"] .badge { background: var(--warn-soft); color: var(--warn); }
+  .insp { max-height: 560px; overflow: auto; }
+
+  table.data { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  table.data th {
+    text-align: left; font-family: var(--font-cond); font-size: 9.5px; font-weight: 600;
+    letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3);
+    padding: 7px 8px; border-bottom: 1px solid var(--rule); background: var(--panel-2);
+    position: sticky; top: 0;
+  }
+  table.data td {
+    padding: 6px 8px; border-bottom: 1px solid var(--rule);
+    font-family: var(--font-mono); font-size: 10.5px; vertical-align: top;
+  }
+  table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.data tr.dim td { color: var(--ink-3); }
+  table.data tr.hit td { background: var(--warn-soft); }
+  .tbl-wrap { overflow-x: auto; }
+
+  .pill {
+    display: inline-block; font-family: var(--font-cond); font-size: 10px; font-weight: 700;
+    letter-spacing: .07em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px;
+  }
+  .p-null { background: var(--warn-soft); color: var(--warn); }
+  .p-sent { background: var(--ok-soft); color: var(--ok); }
+  .p-crit { background: var(--crit-soft); color: var(--crit); }
+  .p-comp { background: var(--comp-soft); color: var(--comp); }
+
+  /* máquina de estados */
+  .fsm { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; }
+  .fsm-step {
+    display: flex; align-items: center; gap: 9px; padding: 7px 9px;
+    border: 1px solid var(--rule); border-radius: var(--r); font-size: 12.5px;
+  }
+  .fsm-step .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rule-2); flex: 0 0 auto; }
+  .fsm-step .nm { font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+  .fsm-step .via { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); margin-left: auto; }
+  .fsm-step.done { border-color: var(--ok); background: var(--ok-soft); }
+  .fsm-step.done .dot { background: var(--ok); }
+  .fsm-step.now { border-color: var(--accent); background: var(--accent-soft); border-width: 1.6px; }
+  .fsm-step.now .dot { background: var(--accent); }
+  .fsm-step.comp { border-color: var(--comp); background: var(--comp-soft); }
+  .fsm-step.comp .dot { background: var(--comp); }
+  .fsm-step.crit { border-color: var(--crit); background: var(--crit-soft); }
+  .fsm-step.crit .dot { background: var(--crit); }
+
+  /* escada de retry */
+  .ladder { display: flex; align-items: stretch; gap: 0; padding: 14px; overflow-x: auto; }
+  .rung {
+    flex: 1 1 0; min-width: 92px; border: 1px solid var(--rule); border-radius: var(--r);
+    padding: 8px 9px; position: relative; background: var(--panel-2);
+  }
+  .rung + .rung { margin-left: 18px; }
+  .rung + .rung::before {
+    content: ''; position: absolute; left: -18px; top: 50%;
+    width: 18px; height: 1px; background: var(--rule-2);
+  }
+  .rung .rl { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; }
+  .rung .rd { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3); }
+  .rung .rc { font-family: var(--font-mono); font-size: 17px; font-weight: 600; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .rung.warm { border-color: var(--warn); background: var(--warn-soft); }
+  .rung.dead { border-color: var(--crit); background: var(--crit-soft); }
+
+  pre.env {
+    margin: 0; padding: 12px 14px; font-family: var(--font-mono); font-size: 10.5px;
+    line-height: 1.62; white-space: pre; overflow-x: auto; color: var(--ink);
+  }
+  pre.env .k { color: var(--ink-3); }
+  pre.env .s { color: var(--ok); }
+  pre.env .n { color: var(--comp); }
+
+  /* ── padrões ───────────────────────────────────────────────────────────── */
+  .patterns { margin-top: 40px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
+  h2.sec { margin: 0; font-size: 21px; font-weight: 600; letter-spacing: -.015em; }
+  .sec-note { color: var(--ink-2); max-width: 68ch; margin: 0 0 20px; }
+  .pat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .pat {
+    background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r-lg);
+    padding: 16px 17px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .pat h3 { margin: 0; font-size: 15.5px; font-weight: 600; }
+  .pat .prob {
+    font-size: 13px; color: var(--crit); border-left: 2px solid var(--crit);
+    padding-left: 10px; margin: 0;
+  }
+  .pat p { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+  .pat p strong { color: var(--ink); font-weight: 600; }
+  .pat code {
+    font-family: var(--font-mono); font-size: 11.5px;
+    background: var(--panel-3); padding: 1px 4px; border-radius: 3px; color: var(--ink);
+  }
+  .pat .run { margin-top: auto; align-self: flex-start; }
+
+  figure { margin: 20px 0 0; }
+  .fg-ui  { font-family: var(--font-ui); font-size: 11.5px; }
+  .fg-m   { font-family: var(--font-mono); font-size: 10px; }
+  .fg-m9  { font-family: var(--font-mono); font-size: 9px; }
+  .fg-m95 { font-family: var(--font-mono); font-size: 9.5px; }
+  .fg-cap { font-family: var(--font-cond); font-size: 11px; font-weight: 600; letter-spacing: .1em; }
+  .fg-neutral { fill: var(--ink-2); color: var(--ink-2); }
+  .fg-ok      { fill: var(--ok);   color: var(--ok); }
+  .fg-crit    { fill: var(--crit); color: var(--crit); }
+  .fg-box       { fill: none; stroke: var(--ink-3); stroke-width: 1.2; }
+  .fg-box-ok    { fill: none; stroke: var(--ok);   stroke-width: 1.4; }
+  .fg-box-crit  { fill: none; stroke: var(--crit); stroke-width: 1.4; stroke-dasharray: 4 3; }
+  .fg-box-strong{ fill: none; stroke: var(--ok);   stroke-width: 1.6; }
+  .fg-line      { stroke: var(--ink-3); color: var(--ink-3); stroke-width: 1.2; fill: none; }
+  .fg-line-dead { stroke: var(--crit); color: var(--crit); stroke-width: 1.4; stroke-dasharray: 4 3; fill: none; }
+  .fg-div { stroke: var(--rule-2); stroke-width: 1; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption { font-size: 12.5px; color: var(--ink-3); margin-top: 8px; max-width: 72ch; }
+  .fig-wrap { overflow-x: auto; }
+
+  footer.end {
+    margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--rule);
+    color: var(--ink-3); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 8px 24px;
+  }
+  footer.end code { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); }
+
+  .sr {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">Simulador · SAGA coreografada sobre Kafka</span>
+      <h1>Console da Saga Coreografada</h1>
+      <p class="sub">
+        Dispare um pedido e acompanhe cada passo: a transação que grava o outbox, o relay que
+        publica, o consumer group que faz o poll, o insert no inbox que barra a duplicata, a
+        escada de retry e a DLT. Nada aqui é aleatório — cada cenário é determinístico.
+      </p>
+    </div>
+    <div class="transport">
+      <button id="btn-play" class="primary" type="button">▶ Executar</button>
+      <button id="btn-step" type="button">⏭ Passo</button>
+      <button id="btn-reset" type="button">↺ Limpar</button>
+      <span class="seg" role="group" aria-label="Velocidade">
+        <button type="button" class="spd" data-mult="1" aria-pressed="false">1×</button>
+        <button type="button" class="spd" data-mult="3" aria-pressed="true">3×</button>
+        <button type="button" class="spd" data-mult="8" aria-pressed="false">8×</button>
+      </span>
+    </div>
+  </header>
+
+  <div class="console">
+
+    <!-- ── coluna 1: lançador ─────────────────────────────────────────── -->
+    <section class="panel" aria-labelledby="h-launch">
+      <h2 id="h-launch">Disparar pedido</h2>
+      <div class="pbody" id="launcher"></div>
+    </section>
+
+    <!-- ── coluna 2: topologia + linha do tempo ──────────────────────── -->
+    <div style="display:flex; flex-direction:column; gap:16px; min-width:0;">
+      <section class="panel" aria-labelledby="h-topo">
+        <div class="phead" id="h-topo">
+          <span>Topologia ao vivo</span>
+          <span id="topo-status" style="font-family:var(--font-mono);font-size:10.5px;text-transform:none;letter-spacing:0;"></span>
+        </div>
+        <div class="topo-wrap">
+          <svg class="topo" id="topo" viewBox="0 0 1000 500" role="img"
+               aria-label="Quatro barramentos de tópicos Kafka no centro; os quatro serviços que publicam acima; os cinco consumer groups abaixo, ligados aos tópicos que assinam.">
+            <defs>
+              <marker id="ah" viewBox="0 0 8 8" refX="6.4" refY="4" markerWidth="5.4" markerHeight="5.4" orient="auto-start-reverse">
+                <path d="M0.6,0.9 L7,4 L0.6,7.1 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <g id="g-edges"></g>
+            <g id="g-rails"></g>
+            <g id="g-nodes"></g>
+            <g id="g-packets"></g>
+          </svg>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-tl">
+        <div class="phead" id="h-tl">
+          <span>Linha do tempo</span>
+          <span id="tl-count" style="font-family:var(--font-mono);font-size:10.5px;text-transform:none;letter-spacing:0;"></span>
+        </div>
+        <div class="tl pbody flush" id="timeline">
+          <p class="empty">Escolha um cenário à esquerda e aperte <strong>Executar</strong>. Use <strong>Passo</strong> para avançar uma operação por vez — é assim que a ordem entre COMMIT do banco e commit de offset fica visível.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- ── coluna 3: inspetores ──────────────────────────────────────── -->
+    <section class="panel" aria-labelledby="h-insp">
+      <div class="phead" id="h-insp"><span>Inspetores</span></div>
+      <div class="tabs" role="tablist" aria-label="Inspetores">
+        <button class="tab" role="tab" id="t-order"  data-tab="order"  aria-selected="true">Pedido</button>
+        <button class="tab" role="tab" id="t-outbox" data-tab="outbox" aria-selected="false">Outbox<span class="badge" id="b-outbox">0</span></button>
+        <button class="tab" role="tab" id="t-inbox"  data-tab="inbox"  aria-selected="false">Inbox<span class="badge" id="b-inbox">0</span></button>
+        <button class="tab" role="tab" id="t-retry"  data-tab="retry"  aria-selected="false" data-tone="warn">Retry / DLT<span class="badge" id="b-retry">0</span></button>
+        <button class="tab" role="tab" id="t-topics" data-tab="topics" aria-selected="false">Offsets</button>
+        <button class="tab" role="tab" id="t-env"    data-tab="env"    aria-selected="false">Envelope</button>
+      </div>
+      <div class="insp" id="inspector"></div>
+    </section>
+  </div>
+
+  <!-- ── padrões obrigatórios ─────────────────────────────────────────── -->
+  <section class="patterns" aria-labelledby="h-pat">
+    <div class="sec-head"><h2 class="sec" id="h-pat">Os padrões obrigatórios</h2></div>
+    <p class="sec-note">
+      Cada um destes existe porque a saga falha de um jeito específico sem ele. O botão roda o
+      cenário que expõe exatamente essa falha — e abre o inspetor onde ela aparece.
+    </p>
+
+    <div class="pat-grid">
+      <article class="pat">
+        <h3>Transactional Outbox</h3>
+        <p class="prob">Gravar no Postgres e publicar no Kafka são dois sistemas. Um crash no meio deixa pedido sem evento — ou evento sem pedido.</p>
+        <p>O evento é gravado na tabela <code>outbox</code> <strong>na mesma transação</strong> do efeito de negócio. Um relay assíncrono lê <code>WHERE published_at IS NULL</code> com <code>FOR UPDATE SKIP LOCKED</code>, publica e marca a linha.</p>
+        <p>O preço: o relay pode publicar e morrer antes de marcar, republicando na volta. Por isso outbox e idempotência são um <strong>par</strong> — usar só um dá falsa segurança.</p>
+        <button class="run" type="button" data-run="happy" data-tab="outbox">Ver o outbox esvaziando</button>
+      </article>
+
+      <article class="pat">
+        <h3>Inbox de idempotência</h3>
+        <p class="prob">Entrega at-least-once num serviço de pagamento significa cobrar duas vezes.</p>
+        <p><code>processed_messages (event_id, consumer_group)</code> com PK composta. O insert acontece na mesma transação do efeito; violação de PK significa "já processei" → rollback, commita o offset, segue.</p>
+        <p>A chave é composta de propósito: <strong>consumer groups distintos precisam processar o mesmo evento</strong>. Usar só <code>event_id</code> faz o segundo consumidor ignorar tudo em silêncio.</p>
+        <button class="run" type="button" data-run="duplicate" data-tab="inbox">Entregar o mesmo evento 2×</button>
+      </article>
+
+      <article class="pat">
+        <h3>Retry escalonado + DLT</h3>
+        <p class="prob">Kafka não tem DLQ. Retryar na própria partição trava todos os outros pedidos que caíram nela.</p>
+        <p>Erro é <strong>classificado antes</strong> de retryar: transitório sobe a escada <code>retry-5s → retry-1m → retry-10m</code>; permanente vai <strong>direto para a DLT</strong>, sem queimar 11 minutos no que nunca vai funcionar.</p>
+        <p>O preço é sério: desviada para o retry, a mensagem pode ser processada <strong>depois</strong> da seguinte do mesmo pedido. A ordenação daquele pedido morre ali.</p>
+        <button class="run" type="button" data-run="transient" data-tab="retry">Subir a escada de retry</button>
+      </article>
+
+      <article class="pat">
+        <h3>orderId como chave de partição</h3>
+        <p class="prob">Sem chave, o produtor distribui em round-robin: o estorno pode ser processado antes da aprovação.</p>
+        <p>A chave de toda mensagem é o <code>orderId</code>. Todos os eventos de um pedido caem na mesma partição, logo são ordenados entre si. Entre pedidos diferentes, ordem é irrelevante.</p>
+        <p>Mas a garantia vale <strong>por tópico</strong>. O Order consome três tópicos e pode ver <code>stock.reserved</code> antes de <code>payment.approved</code>. Nenhuma chave resolve isso — só a máquina de estados monotônica.</p>
+        <button class="run" type="button" data-run="happy" data-tab="topics">Ver partição e offsets</button>
+      </article>
+
+      <article class="pat">
+        <h3>Compensação</h3>
+        <p class="prob">O envio falhou, mas o pagamento já foi autorizado e o estoque já foi reservado. Alguém precisa desfazer.</p>
+        <p>Em coreografia não há quem mande desfazer. O Payment assina <code>ecommerce.shipping.v1</code> e estorna por conta própria; o Inventory assina o mesmo tópico e libera o estoque. <strong>Compensação dupla e paralela.</strong></p>
+        <p>Repare no acoplamento: o Payment precisa conhecer as falhas de <strong>todos</strong> os passos posteriores. Acrescentar uma 5ª etapa obriga a mexer em todos os serviços anteriores.</p>
+        <button class="run" type="button" data-run="ship-fail" data-tab="order">Forçar compensação dupla</button>
+      </article>
+
+      <article class="pat">
+        <h3>Fail secure</h3>
+        <p class="prob">Um <code>catch</code> que libera estoque ou aprova pagamento "porque deu erro" é o pior bug possível.</p>
+        <p>Erro desconhecido <strong>não commita o offset</strong>. A mensagem volta, sobe a escada e termina na DLT. Estado indeterminado nunca vira estado favorável ao cliente.</p>
+        <p>O efeito colateral: a DLT acumula. Sem ferramenta de reprocessamento ela vira cemitério — ninguém abre um tópico com 4 mil mensagens sem CLI.</p>
+        <button class="run" type="button" data-run="poison" data-tab="retry">Enviar evento inválido</button>
+      </article>
+    </div>
+
+    <div class="fig-wrap">
+      <figure>
+        <svg viewBox="0 0 780 250" role="img"
+             aria-label="À esquerda, sem outbox: o serviço commita no Postgres e o publish no Kafka nunca acontece se o processo morre entre os dois. À direita, com outbox: uma única transação grava o pedido e a linha de outbox, e um relay separado publica depois.">
+          <!-- ── esquerda: sem outbox ─────────────────────────────────── -->
+          <text x="8" y="16" class="fg-cap fg-crit">SEM OUTBOX</text>
+
+          <rect x="8" y="34" width="96" height="40" rx="4" class="fg-box"></rect>
+          <text x="56" y="58" text-anchor="middle" class="fg-ui fg-neutral">handler</text>
+
+          <line x1="104" y1="54" x2="176" y2="54" class="fg-line" marker-end="url(#ah)"></line>
+          <text x="140" y="46" text-anchor="middle" class="fg-m95 fg-neutral">1. COMMIT</text>
+
+          <rect x="180" y="34" width="96" height="40" rx="4" class="fg-box-ok"></rect>
+          <text x="228" y="52" text-anchor="middle" class="fg-m fg-ok">Postgres</text>
+          <text x="228" y="65" text-anchor="middle" class="fg-m9 fg-ok">pedido gravado</text>
+
+          <line x1="56" y1="74" x2="56" y2="140" class="fg-line-dead"></line>
+          <text x="66" y="112" class="fg-m95 fg-crit">processo morre aqui</text>
+
+          <line x1="56" y1="140" x2="176" y2="140" class="fg-line-dead" marker-end="url(#ah)"></line>
+          <text x="118" y="132" text-anchor="middle" class="fg-m95 fg-crit">2. publish</text>
+
+          <rect x="180" y="120" width="96" height="40" rx="4" class="fg-box-crit"></rect>
+          <text x="228" y="138" text-anchor="middle" class="fg-m fg-crit">Kafka</text>
+          <text x="228" y="151" text-anchor="middle" class="fg-m9 fg-crit">evento nunca sai</text>
+
+          <text x="8" y="196" class="fg-ui fg-crit">Pedido existe, saga nunca começa.</text>
+          <text x="8" y="212" class="fg-ui fg-crit">Ninguém percebe até o cliente ligar.</text>
+
+          <line x1="352" y1="20" x2="352" y2="230" class="fg-div"></line>
+
+          <!-- ── direita: com outbox ──────────────────────────────────── -->
+          <text x="392" y="16" class="fg-cap fg-ok">COM OUTBOX</text>
+
+          <rect x="392" y="34" width="96" height="40" rx="4" class="fg-box"></rect>
+          <text x="440" y="58" text-anchor="middle" class="fg-ui fg-neutral">handler</text>
+
+          <line x1="488" y1="54" x2="536" y2="54" class="fg-line" marker-end="url(#ah)"></line>
+
+          <rect x="540" y="26" width="150" height="56" rx="4" class="fg-box-strong"></rect>
+          <text x="615" y="43" text-anchor="middle" class="fg-m fg-ok">UMA transação</text>
+          <text x="615" y="57" text-anchor="middle" class="fg-m9 fg-ok">INSERT pedido</text>
+          <text x="615" y="70" text-anchor="middle" class="fg-m9 fg-ok">INSERT outbox</text>
+
+          <line x1="615" y1="82" x2="615" y2="122" class="fg-line" marker-end="url(#ah)"></line>
+          <text x="625" y="106" class="fg-m95 fg-neutral">SKIP LOCKED</text>
+
+          <rect x="540" y="126" width="150" height="38" rx="4" class="fg-box"></rect>
+          <text x="615" y="150" text-anchor="middle" class="fg-m fg-neutral">relay (assíncrono)</text>
+
+          <line x1="540" y1="145" x2="470" y2="145" class="fg-line" marker-end="url(#ah)"></line>
+          <rect x="392" y="126" width="74" height="38" rx="4" class="fg-box-ok"></rect>
+          <text x="429" y="150" text-anchor="middle" class="fg-m fg-ok">Kafka</text>
+
+          <text x="392" y="196" class="fg-ui fg-ok">Ou os dois existem, ou nenhum.</text>
+          <text x="392" y="212" class="fg-ui fg-neutral">Custo: latência do relay, e publicação</text>
+          <text x="392" y="228" class="fg-ui fg-neutral">at-least-once — exige idempotência.</text>
+        </svg>
+        <figcaption>
+          A diferença é uma só: sem outbox, a intenção de publicar vive fora da transação e desaparece com o processo. Com outbox, ela é uma linha gravada junto do pedido, e publicar passa a ser um segundo problema — resolvível, porque a intenção sobreviveu.
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <footer class="end">
+    <span>Simulação determinística — mesmo cenário, mesmo resultado, sempre.</span>
+    <span>Contratos reais em <code>packages/contracts</code>; decisões em <code>docs/adr/</code>.</span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     1. TOPOLOGIA — a mesma de packages/contracts/src/topics.ts
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const PARTITIONS = 3;
+
+  const TOPICS = [
+    { id: 'orders',    name: 'ecommerce.orders.v1',    y: 150 },
+    { id: 'payments',  name: 'ecommerce.payments.v1',  y: 202 },
+    { id: 'inventory', name: 'ecommerce.inventory.v1', y: 254 },
+    { id: 'shipping',  name: 'ecommerce.shipping.v1',  y: 306 },
+  ];
+
+  const PRODUCERS = [
+    { svc: 'order',     label: 'Order Service',     topic: 'orders',    x: 155, cx: 242.5 },
+    { svc: 'payment',   label: 'Payment Service',   topic: 'payments',  x: 367, cx: 454.5 },
+    { svc: 'inventory', label: 'Inventory Service', topic: 'inventory', x: 578, cx: 665.5 },
+    { svc: 'shipping',  label: 'Shipping Service',  topic: 'shipping',  x: 790, cx: 877.5 },
+  ];
+
+  /* Repare no payment-service: assina inventory e shipping, domínios que não são dele.
+     É o que a coreografia cobra para conseguir compensar. */
+  const GROUPS = [
+    { id: 'order-projection',     svc: 'order',        x: 155, cx: 232.5, subs: ['payments', 'inventory', 'shipping'] },
+    { id: 'payment-service',      svc: 'payment',      x: 319, cx: 396.5, subs: ['orders', 'inventory', 'shipping'] },
+    { id: 'inventory-service',    svc: 'inventory',    x: 483, cx: 560.5, subs: ['payments', 'shipping'] },
+    { id: 'shipping-service',     svc: 'shipping',     x: 646, cx: 723.5, subs: ['inventory'] },
+    { id: 'notification-service', svc: 'notification', x: 810, cx: 887.5, subs: ['orders', 'payments', 'inventory', 'shipping'] },
+  ];
+
+  const SVC_LABEL = {
+    order: 'Order', payment: 'Payment', inventory: 'Inventory',
+    shipping: 'Shipping', notification: 'Notification',
+  };
+
+  const EVENT_TOPIC = {
+    'order.created': 'orders', 'order.confirmed': 'orders', 'order.cancelled': 'orders',
+    'payment.approved': 'payments', 'payment.failed': 'payments', 'payment.refunded': 'payments',
+    'stock.reserved': 'inventory', 'stock.unavailable': 'inventory', 'stock.released': 'inventory',
+    'shipment.created': 'shipping', 'shipment.failed': 'shipping',
+  };
+
+  const EVENT_AGG = {
+    'order.created': 'order', 'order.confirmed': 'order', 'order.cancelled': 'order',
+    'payment.approved': 'payment', 'payment.failed': 'payment', 'payment.refunded': 'payment',
+    'stock.reserved': 'stock-reservation', 'stock.unavailable': 'stock-reservation',
+    'stock.released': 'stock-reservation',
+    'shipment.created': 'shipment', 'shipment.failed': 'shipment',
+  };
+
+  const RETRY_LADDER = [
+    { suffix: 'retry-5s',  label: '5s' },
+    { suffix: 'retry-1m',  label: '1m' },
+    { suffix: 'retry-10m', label: '10m' },
+  ];
+
+  const GEO = { prodY: 20, prodH: 46, prodW: 175, consY: 428, consH: 46, consW: 155 };
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     2. CENÁRIOS — gatilhos determinísticos, nada de Math.random()
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const SCENARIOS = [
+    { id: 'happy', grp: 'Caminhos da saga', tone: 'ok',
+      name: 'Caminho feliz',
+      desc: 'R$ 99,80 · BOOK-001 · 01310-000',
+      spec: { cents: 9980, sku: 'BOOK-001', zip: '01310-000' } },
+
+    { id: 'pay-fail', grp: 'Caminhos da saga', tone: 'crit',
+      name: 'Pagamento recusado',
+      desc: 'total termina em .13 → payment.failed',
+      spec: { cents: 9913, sku: 'BOOK-001', zip: '01310-000' } },
+
+    { id: 'stock-out', grp: 'Caminhos da saga', tone: 'comp',
+      name: 'Estoque indisponível',
+      desc: 'SKU OUT-7788 → Payment estorna',
+      spec: { cents: 24990, sku: 'OUT-7788', zip: '01310-000' } },
+
+    { id: 'ship-fail', grp: 'Caminhos da saga', tone: 'comp',
+      name: 'Falha no envio',
+      desc: 'CEP 00000-000 → compensação dupla',
+      spec: { cents: 15900, sku: 'BOOK-001', zip: '00000-000' } },
+
+    { id: 'duplicate', grp: 'Idempotência', tone: 'warn',
+      name: 'Mensagem duplicada',
+      desc: 'relay publica 2× → inbox barra a 2ª',
+      spec: { cents: 9980, sku: 'BOOK-001', zip: '01310-000', dup: true } },
+
+    { id: 'crash', grp: 'Idempotência', tone: 'warn',
+      name: 'Crash antes do commit de offset',
+      desc: 'reentrega do mesmo record → inbox barra',
+      spec: { cents: 9980, sku: 'BOOK-001', zip: '01310-000', crash: true } },
+
+    { id: 'transient', grp: 'Retry e DLT', tone: 'warn',
+      name: 'Erro transitório',
+      desc: 'Inventory falha 2× → recupera em retry-1m',
+      spec: { cents: 9980, sku: 'BOOK-001', zip: '01310-000', failUntil: 2 } },
+
+    { id: 'transient-dlt', grp: 'Retry e DLT', tone: 'crit',
+      name: 'Transitório que não recupera',
+      desc: 'esgota a escada inteira → DLT',
+      spec: { cents: 9980, sku: 'BOOK-001', zip: '01310-000', failUntil: 99 } },
+
+    { id: 'poison', grp: 'Retry e DLT', tone: 'crit',
+      name: 'Evento inválido (schema)',
+      desc: 'erro permanente → DLT direto, sem retry',
+      spec: { cents: 9980, sku: 'BOOK-001', zip: '01310-000', poison: true } },
+  ];
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     3. ESTADO
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const BASE_TS = Date.parse('2026-08-26T12:00:00.000Z');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let S = null;
+
+  function freshState() {
+    const services = {};
+    for (const svc of Object.keys(SVC_LABEL)) {
+      services[svc] = { outbox: [], inbox: [], effects: [] };
+    }
+    const records = {};
+    for (const t of TOPICS) records[t.id] = Array.from({ length: PARTITIONS }, () => []);
+
+    const offsets = {};
+    for (const g of GROUPS) {
+      offsets[g.id] = {};
+      for (const t of g.subs) offsets[g.id][t] = Array(PARTITIONS).fill(0);
+    }
+
+    return {
+      clock: 0, seq: 0, scenario: null, spec: null,
+      order: null, payment: null, reservation: null,
+      services, records, offsets,
+      retry: [], dlt: [],
+      attempts: new Map(),      // `${group}|${eventId}` -> tentativas já feitas
+      crashed: false, duplicated: false,
+      timeline: [], pending: [], packets: [], ladder: [0, 0, 0],
+      selected: null, drained: false,
+    };
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     4. UTILIDADES
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const el = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const brl = (c) => 'R$ ' + (c / 100).toFixed(2).replace('.', ',');
+
+  function hash(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  const partitionFor = (key) => hash(key) % PARTITIONS;
+
+  const iso = (ms) => new Date(BASE_TS + ms).toISOString();
+
+  function uuid(n) {
+    return '018f3f4e-0000-7000-8000-' + String(n).padStart(12, '0');
+  }
+
+  function mkEvent(type, payload, cause) {
+    S.seq += 1;
+    const id = uuid(S.seq);
+    return {
+      eventId: id,
+      eventType: type,
+      eventVersion: 1,
+      occurredAt: iso(S.clock),
+      aggregateId: S.order.orderId,
+      aggregateType: EVENT_AGG[type],
+      correlationId: S.order.correlationId,
+      causationId: cause ? cause.eventId : id,
+      producer: producerOf(type) + '-service@0.1.0',
+      payload,
+    };
+  }
+
+  const producerOf = (type) => type.split('.')[0] === 'stock' ? 'inventory'
+    : type.split('.')[0] === 'shipment' ? 'shipping'
+    : type.split('.')[0];
+
+  const svcOfEventType = (type) => producerOf(type);
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     5. MOTOR — cada passo é uma operação atômica e nomeada
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const COST = { http: 4, tx: 3, outbox: 2, produce: 6, poll: 8, effect: 5, commit: 2, skip: 2, error: 3, retry: 4, dlt: 4, comp: 5, state: 2 };
+
+  function log(kind, who, html, ev) {
+    S.clock += COST[kind] ?? 3;
+    S.timeline.push({ t: S.clock, kind, who, html, ev: ev || null });
+  }
+
+  const push = (fn) => S.pending.push(fn);
+  const unshift = (fn) => S.pending.unshift(fn);
+
+  /* ── borda HTTP ─────────────────────────────────────────────────────── */
+  function startScenario(scn) {
+    S = freshState();
+    S.scenario = scn.id;
+    S.spec = scn.spec;
+
+    const orderId = uuid(9000 + SCENARIOS.findIndex((s) => s.id === scn.id));
+    S.order = {
+      orderId,
+      customerId: uuid(500),
+      correlationId: 'corr-' + orderId.slice(-6),
+      status: 'PENDING',
+      cents: scn.spec.cents,
+      sku: scn.spec.sku,
+      zip: scn.spec.zip,
+      partition: partitionFor(orderId),
+      awaiting: new Set(),
+      applied: [],
+      reason: null,
+      history: ['PENDING'],
+    };
+
+    push(() => {
+      log('http', 'cliente → order', `<span class="kind k-http">HTTP</span>POST <code>/orders</code> · <code>Idempotency-Key: k-${S.order.orderId.slice(-4)}</code> · ${brl(S.order.cents)}`);
+      push(txCreateOrder);
+    });
+  }
+
+  function txCreateOrder() {
+    log('tx', 'order-service', '<span class="kind k-tx">TX</span>BEGIN');
+    const ev = mkEvent('order.created', {
+      orderId: S.order.orderId,
+      customerId: S.order.customerId,
+      items: [{ sku: S.order.sku, name: 'Item de teste', quantity: 1, unitPriceCents: S.order.cents }],
+      totalAmountCents: S.order.cents,
+      currency: 'BRL',
+      shippingAddress: { street: 'Rua Exemplo', number: '100', district: 'Centro', city: 'São Paulo', state: 'SP', zipCode: S.order.zip, country: 'BR' },
+    }, null);
+
+    push(() => {
+      log('effect', 'order-service', `<span class="kind k-effect">DB</span>INSERT <code>orders</code> · status <code>PENDING</code>`);
+      push(() => {
+        S.services.order.outbox.push({ ev, publishedAt: null, attempts: 0 });
+        log('outbox', 'order-service', `<span class="kind k-outbox">OUTBOX</span>INSERT <code>order.created</code> · <code>published_at = NULL</code>`, ev);
+        push(() => {
+          log('tx', 'order-service', '<span class="kind k-tx">TX</span>COMMIT — pedido e evento agora existem ou não existem juntos');
+          push(() => {
+            log('http', 'order → cliente', `<span class="kind k-http">HTTP</span>202 Accepted · <code>${S.order.orderId.slice(-12)}</code>`);
+            push(() => relay('order'));
+          });
+        });
+      });
+    });
+  }
+
+  /* ── relay do outbox ───────────────────────────────────────────────── */
+  function relay(svc) {
+    const row = S.services[svc].outbox.find((r) => r.publishedAt === null && !r.claimed);
+    if (!row) return;
+    row.claimed = true;   // FOR UPDATE SKIP LOCKED: a linha é travada ao ser escolhida
+
+    log('outbox', svc + '-service', `<span class="kind k-outbox">RELAY</span><code>SELECT … FOR UPDATE SKIP LOCKED</code> → 1 linha pendente`);
+
+    push(() => {
+      produce(row.ev);
+      push(() => {
+        row.publishedAt = iso(S.clock);
+        log('outbox', svc + '-service', `<span class="kind k-outbox">OUTBOX</span>UPDATE <code>published_at</code> — linha liquidada`);
+
+        // Duplicata: o relay publicou e morreu antes de marcar. Na volta, republica.
+        if (S.spec.dup && !S.duplicated && row.ev.eventType === 'order.created') {
+          S.duplicated = true;
+          push(() => {
+            log('error', svc + '-service', `<span class="kind k-error">FALHA</span>relay morreu depois do publish e antes do <code>UPDATE</code> — na volta ele republica`);
+            push(() => {
+              produce(row.ev, true);
+              push(() => relay(svc));
+            });
+          });
+          return;
+        }
+        push(() => relay(svc));
+      });
+    });
+  }
+
+  /* ── produção no broker ────────────────────────────────────────────── */
+  function produce(ev, isDup) {
+    const topic = EVENT_TOPIC[ev.eventType];
+    const p = S.order.partition;
+    const offset = S.records[topic][p].length;
+    S.records[topic][p].push({ offset, key: ev.aggregateId, ev, dup: !!isDup });
+
+    log('produce', svcOfEventType(ev.eventType) + '-service',
+      `<span class="kind k-produce">PRODUCE</span><code>${ev.eventType}</code> → <code>${topic}</code> · p${p} @ offset ${offset}` +
+      (isDup ? ' · <strong>duplicata</strong>' : ''), ev);
+
+    const consumers = GROUPS.filter((g) => g.subs.includes(topic));
+    for (const g of consumers) {
+      spawnPacket(ev, topic, g);
+      push(() => deliver(g, topic, p, offset));
+    }
+  }
+
+  /* ── entrega a um consumer group ───────────────────────────────────── */
+  function deliver(group, topic, p, offset, retryStep) {
+    const rec = S.records[topic][p][offset];
+    const ev = rec.ev;
+    const src = retryStep === undefined ? topic : `${topic}.${group.id}.${RETRY_LADDER[retryStep - 1].suffix}`;
+
+    log('poll', group.id, `<span class="kind k-poll">POLL</span><code>${ev.eventType}</code> de <code>${src}</code> · p${p} @ ${offset}`, ev);
+
+    push(() => handle(group, topic, p, offset, ev, retryStep));
+  }
+
+  function handle(group, topic, p, offset, ev, retryStep) {
+    const svc = group.svc;
+    log('tx', group.id, '<span class="kind k-tx">TX</span>BEGIN');
+
+    push(() => {
+      const already = S.services[svc].inbox.some((r) => r.eventId === ev.eventId && r.group === group.id && r.applied);
+      if (already) {
+        S.services[svc].inbox.push({ eventId: ev.eventId, group: group.id, type: ev.eventType, applied: false });
+        log('skip', group.id,
+          `<span class="kind k-skip">DUPLICATA</span>violação de PK em <code>processed_messages</code> → ROLLBACK. <strong>Efeito de negócio NÃO aplicado.</strong>`, ev);
+        push(() => commitOffset(group, topic, p, offset, retryStep));
+        return;
+      }
+
+      S.services[svc].inbox.push({ eventId: ev.eventId, group: group.id, type: ev.eventType, applied: true });
+      log('effect', group.id, `<span class="kind k-effect">INBOX</span>INSERT <code>processed_messages</code> · <code>(${ev.eventId.slice(-6)}, ${group.id})</code>`, ev);
+
+      push(() => runHandler(group, topic, p, offset, ev, retryStep));
+    });
+  }
+
+  function runHandler(group, topic, p, offset, ev, retryStep) {
+    const svc = group.svc;
+    let result;
+    try {
+      result = HANDLERS[group.id](ev, retryStep ?? 0);
+    } catch (err) {
+      // Rollback: o INSERT no inbox some junto. Nada foi aplicado.
+      S.services[svc].inbox = S.services[svc].inbox.filter(
+        (r) => !(r.eventId === ev.eventId && r.group === group.id && r.applied));
+      log('error', group.id,
+        `<span class="kind k-error">${err.permanent ? 'PERMANENTE' : 'RETRIÁVEL'}</span>` +
+        `${esc(err.message)} → ROLLBACK, offset <strong>não</strong> commitado`, ev);
+      push(() => route(group, topic, p, offset, ev, retryStep, err));
+      return;
+    }
+
+    if (result.invalid) {
+      log('skip', group.id,
+        `<span class="kind k-skip">TRANSIÇÃO INVÁLIDA</span><code>${ev.eventType}</code> não se aplica a <code>${S.order.status}</code> — ignorado, sem corromper o agregado`, ev);
+      push(() => commitOffset(group, topic, p, offset, retryStep));
+      return;
+    }
+
+    if (result.effect) {
+      S.services[svc].effects.push(result.effect);
+      log(result.comp ? 'comp' : 'effect', group.id,
+        `<span class="kind ${result.comp ? 'k-comp' : 'k-effect'}">${result.comp ? 'COMPENSA' : 'DB'}</span>${result.effect}`, ev);
+    }
+
+    if (result.state) {
+      const h = S.order.history;
+      if (h[h.length - 1] !== result.state) h.push(result.state);
+      log('state', group.id, `<span class="kind k-state">ESTADO</span>pedido → <code>${result.state}</code>${result.awaiting ? ` · aguardando ${result.awaiting}` : ''}`, ev);
+    }
+
+    const emits = result.emit || [];
+    const step = () => {
+      if (emits.length === 0) {
+        push(() => {
+          log('tx', group.id, '<span class="kind k-tx">TX</span>COMMIT');
+          push(() => maybeCrash(group, topic, p, offset, ev, retryStep));
+        });
+        return;
+      }
+      const next = emits.shift();
+      const nev = mkEvent(next.type, next.payload, ev);
+      S.services[svc].outbox.push({ ev: nev, publishedAt: null, attempts: 0 });
+      log('outbox', group.id, `<span class="kind k-outbox">OUTBOX</span>INSERT <code>${next.type}</code> — na MESMA transação do efeito`, nev);
+      push(step);
+    };
+    push(step);
+  }
+
+  function maybeCrash(group, topic, p, offset, ev, retryStep) {
+    if (S.spec.crash && !S.crashed && group.id === 'payment-service' && ev.eventType === 'order.created') {
+      S.crashed = true;
+      log('error', group.id,
+        `<span class="kind k-error">CRASH</span>processo morreu <strong>depois do COMMIT</strong> e antes do commit de offset — o record volta no próximo poll`, ev);
+      push(() => deliver(group, topic, p, offset, retryStep));
+      return;
+    }
+    push(() => commitOffset(group, topic, p, offset, retryStep));
+  }
+
+  function commitOffset(group, topic, p, offset, retryStep) {
+    if (retryStep === undefined) {
+      S.offsets[group.id][topic][p] = Math.max(S.offsets[group.id][topic][p], offset + 1);
+      log('commit', group.id, `<span class="kind k-commit">OFFSET</span>commit ${offset + 1} em <code>${topic}</code> p${p} — só agora, depois do COMMIT do banco`);
+    } else {
+      S.retry = S.retry.filter((r) => !(r.ev === S.records[topic][p][offset].ev && r.group === group.id));
+      log('commit', group.id,
+        `<span class="kind k-commit">OFFSET</span>commit em <code>${RETRY_LADDER[retryStep - 1].suffix}</code> — recuperado na tentativa ${retryStep + 1}`);
+    }
+    push(() => relay(group.svc));
+  }
+
+  /* ── classificação de erro e roteamento ────────────────────────────── */
+  function route(group, topic, p, offset, ev, retryStep, err) {
+    const attempt = retryStep === undefined ? 0 : retryStep;
+    const fromMain = retryStep === undefined;
+
+    /* Assim que a mensagem é aceita no tópico de retry (ou na DLT), o offset do tópico
+       PRINCIPAL é commitado. É esse commit — e não o retry em si — que devolve a partição
+       ao fluxo normal. Sem ele, todos os outros pedidos daquela partição ficariam presos. */
+    const releaseMain = () => {
+      if (!fromMain) return;
+      S.offsets[group.id][topic][p] = Math.max(S.offsets[group.id][topic][p], offset + 1);
+      log('commit', group.id,
+        `<span class="kind k-commit">OFFSET</span>commit ${offset + 1} em <code>${topic}</code> p${p} — a mensagem saiu da partição principal, que volta a andar`);
+    };
+
+    if (err.permanent) {
+      toDlt(group, topic, ev, err, attempt, 'erro permanente — retry não conserta schema inválido');
+      releaseMain();
+      return;
+    }
+
+    if (attempt >= RETRY_LADDER.length) {
+      toDlt(group, topic, ev, err, attempt, 'escada de retry esgotada');
+      releaseMain();
+      return;
+    }
+
+    const rung = RETRY_LADDER[attempt];
+    const dest = `${topic}.${group.id}.${rung.suffix}`;
+    S.ladder[attempt] += 1;
+    S.retry.push({ ev, group: group.id, topic, step: attempt + 1, err: err.message });
+
+    log('retry', group.id,
+      `<span class="kind k-retry">RETRY ${attempt + 1}/3</span>desviado para <code>${dest}</code> · <code>x-retry-count: ${attempt + 1}</code>` +
+      `<br><span style="color:var(--ink-3);font-size:11.5px">a partição principal segue livre — mas a ordenação deste pedido acabou de morrer</span>`, ev);
+
+    releaseMain();
+    push(() => deliver(group, topic, p, offset, attempt + 1));
+  }
+
+  function toDlt(group, topic, ev, err, attempt, why) {
+    const dest = `${topic}.${group.id}.DLT`;
+    S.dlt.push({
+      ev, group: group.id, topic,
+      headers: {
+        'x-original-topic': topic,
+        'x-retry-count': String(attempt),
+        'x-first-failure-at': iso(S.clock),
+        'x-last-error': err.message,
+        'x-stacktrace-hash': 'sha256:' + (hash(err.message) >>> 0).toString(16).padStart(8, '0'),
+        'x-consumer-group': group.id,
+      },
+    });
+    S.retry = S.retry.filter((r) => !(r.ev.eventId === ev.eventId && r.group === group.id));
+    log('dlt', group.id,
+      `<span class="kind k-dlt">DLT</span>→ <code>${dest}</code> · ${why}` +
+      `<br><span style="color:var(--ink-3);font-size:11.5px">a saga parou aqui. Sem CLI de reprocessamento, esta mensagem some de vista.</span>`, ev);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     6. HANDLERS — um por consumer group, iguais aos do plano
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const retriable = (msg) => { const e = new Error(msg); e.permanent = false; throw e; };
+  const permanent = (msg) => { const e = new Error(msg); e.permanent = true; throw e; };
+
+  const HANDLERS = {
+
+    /* Payment: autoriza no order.created e ESTORNA reagindo a falhas de passos posteriores. */
+    'payment-service': (ev) => {
+      if (ev.eventType === 'order.created') {
+        const cents = ev.payload.totalAmountCents;
+        if (cents % 100 === 13) {
+          return {
+            effect: `gateway recusou · <code>INSUFFICIENT_FUNDS</code>`,
+            emit: [{ type: 'payment.failed', payload: { paymentId: uuid(701), orderId: S.order.orderId, amountCents: cents, currency: 'BRL', failureCode: 'INSUFFICIENT_FUNDS', reason: 'Saldo insuficiente', failedAt: iso(S.clock) } }],
+          };
+        }
+        S.payment = { id: uuid(700), cents, authorized: true, refunded: false };
+        return {
+          effect: `autorização ${brl(cents)} · INSERT <code>payments</code>`,
+          emit: [{ type: 'payment.approved', payload: { paymentId: S.payment.id, orderId: S.order.orderId, amountCents: cents, currency: 'BRL', authorizationCode: 'AUTH-7F3C91', instrument: { gatewayToken: 'tok_2Nf8xQ...', cardLast4: '4242', brand: 'VISA' }, approvedAt: iso(S.clock) } }],
+        };
+      }
+
+      if (ev.eventType === 'stock.unavailable' || ev.eventType === 'shipment.failed') {
+        if (!S.payment || !S.payment.authorized || S.payment.refunded) return { invalid: true };
+        S.payment.refunded = true;
+        return {
+          comp: true,
+          effect: `estorno ${brl(S.payment.cents)} no gateway · UPDATE <code>payments</code>`,
+          emit: [{ type: 'payment.refunded', payload: { paymentId: S.payment.id, orderId: S.order.orderId, refundId: uuid(702), amountCents: S.payment.cents, currency: 'BRL', compensationFor: ev.eventType, refundedAt: iso(S.clock) } }],
+        };
+      }
+      return { invalid: true };
+    },
+
+    /* Inventory: reserva no payment.approved e LIBERA reagindo a shipment.failed. */
+    'inventory-service': (ev, attempt) => {
+      if (ev.eventType === 'payment.approved') {
+        if (S.spec.poison) {
+          permanent('payload viola o schema: campo "items" ausente na v1');
+        }
+        if (S.spec.failUntil !== undefined && attempt < S.spec.failUntil) {
+          retriable('timeout ao consultar o serviço de saldo (ETIMEDOUT após 5000ms)');
+        }
+        if (S.order.sku.startsWith('OUT-')) {
+          return {
+            effect: `saldo de <code>${S.order.sku}</code>: 0 disponível, 1 pedido`,
+            emit: [{ type: 'stock.unavailable', payload: { orderId: S.order.orderId, unavailableItems: [{ sku: S.order.sku, requested: 1, available: 0 }], checkedAt: iso(S.clock) } }],
+          };
+        }
+        S.reservation = { id: uuid(710), released: false };
+        return {
+          effect: `reserva 1× <code>${S.order.sku}</code> · expira em 10 min`,
+          emit: [{ type: 'stock.reserved', payload: { reservationId: S.reservation.id, orderId: S.order.orderId, items: [{ sku: S.order.sku, quantity: 1 }], expiresAt: iso(S.clock + 600000), reservedAt: iso(S.clock) } }],
+        };
+      }
+
+      if (ev.eventType === 'shipment.failed') {
+        if (!S.reservation || S.reservation.released) return { invalid: true };
+        S.reservation.released = true;
+        return {
+          comp: true,
+          effect: `devolve 1× <code>${S.order.sku}</code> ao saldo`,
+          emit: [{ type: 'stock.released', payload: { reservationId: S.reservation.id, orderId: S.order.orderId, items: [{ sku: S.order.sku, quantity: 1 }], compensationFor: 'shipment.failed', releasedAt: iso(S.clock) } }],
+        };
+      }
+      return { invalid: true };
+    },
+
+    /* Shipping: cria a etiqueta. Não compensa nada — é o último passo. */
+    'shipping-service': (ev) => {
+      if (ev.eventType !== 'stock.reserved') return { invalid: true };
+      if (S.order.zip.startsWith('00000')) {
+        return {
+          effect: `transportadora recusou o CEP <code>${S.order.zip}</code>`,
+          emit: [{ type: 'shipment.failed', payload: { orderId: S.order.orderId, failureCode: 'ADDRESS_NOT_SERVICEABLE', reason: 'CEP fora da área de cobertura', failedAt: iso(S.clock) } }],
+        };
+      }
+      return {
+        effect: `etiqueta <code>BR9384726512</code> · JADLOG`,
+        emit: [{ type: 'shipment.created', payload: { shipmentId: uuid(720), orderId: S.order.orderId, carrier: 'JADLOG', trackingCode: 'BR9384726512', labelUrl: 'https://labels.example.com/BR9384726512.pdf', estimatedDeliveryAt: iso(S.clock + 3 * 86400000), createdAt: iso(S.clock) } }],
+      };
+    },
+
+    /* Notification: consome tudo, não publica evento de negócio. */
+    'notification-service': (ev) => ({
+      effect: `e-mail <code>${ev.eventType}</code> → <code>j***@example.com</code> (PII mascarada no log)`,
+    }),
+
+    /* Projeção do pedido: a máquina de estados, idempotente e monotônica. */
+    'order-projection': (ev) => {
+      const o = S.order;
+      const t = ev.eventType;
+
+      if (t === 'payment.approved') {
+        if (o.status !== 'PENDING') return { invalid: true };
+        o.status = 'PAYMENT_APPROVED';
+        return { state: o.status };
+      }
+
+      if (t === 'payment.failed') {
+        if (o.status !== 'PENDING') return { invalid: true };
+        o.status = 'CANCELLED'; o.reason = 'PAYMENT_FAILED';
+        return { state: o.status, emit: [cancelEvent()] };
+      }
+
+      if (t === 'stock.reserved') {
+        if (o.status !== 'PAYMENT_APPROVED') return { invalid: true };
+        o.status = 'STOCK_RESERVED';
+        return { state: o.status };
+      }
+
+      if (t === 'stock.unavailable') {
+        if (o.status !== 'PAYMENT_APPROVED') return { invalid: true };
+        o.status = 'COMPENSATING'; o.reason = 'STOCK_UNAVAILABLE';
+        o.awaiting = new Set(['PAYMENT_REFUNDED']);
+        return { state: o.status, awaiting: 'PAYMENT_REFUNDED' };
+      }
+
+      if (t === 'shipment.created') {
+        if (o.status !== 'STOCK_RESERVED') return { invalid: true };
+        o.status = 'CONFIRMED';
+        return {
+          state: o.status,
+          emit: [{ type: 'order.confirmed', payload: { orderId: o.orderId, customerId: o.customerId, totalAmountCents: o.cents, currency: 'BRL', confirmedAt: iso(S.clock) } }],
+        };
+      }
+
+      if (t === 'shipment.failed') {
+        if (o.status !== 'STOCK_RESERVED') return { invalid: true };
+        o.status = 'COMPENSATING'; o.reason = 'SHIPMENT_FAILED';
+        o.awaiting = new Set(['PAYMENT_REFUNDED', 'STOCK_RELEASED']);
+        return { state: o.status, awaiting: 'PAYMENT_REFUNDED + STOCK_RELEASED' };
+      }
+
+      if (t === 'payment.refunded' || t === 'stock.released') {
+        const key = t === 'payment.refunded' ? 'PAYMENT_REFUNDED' : 'STOCK_RELEASED';
+        if (o.status !== 'COMPENSATING' || !o.awaiting.has(key)) return { invalid: true };
+        o.awaiting.delete(key);
+        o.applied.push(key);
+        if (o.awaiting.size === 0) {
+          o.status = 'CANCELLED';
+          return { state: o.status, emit: [cancelEvent()] };
+        }
+        return { effect: `compensação <code>${key}</code> registrada`, awaiting: [...o.awaiting].join(' + '), state: 'COMPENSATING' };
+      }
+
+      return { invalid: true };
+    },
+  };
+
+  function cancelEvent() {
+    return {
+      type: 'order.cancelled',
+      payload: {
+        orderId: S.order.orderId, customerId: S.order.customerId,
+        reason: S.order.reason, compensationsApplied: [...S.order.applied],
+        cancelledAt: iso(S.clock),
+      },
+    };
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     7. TOPOLOGIA — construção do SVG e atualização ao vivo
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  };
+
+  const railOf = (id) => TOPICS.find((t) => t.id === id);
+  const nodeRefs = { prod: {}, cons: {}, rail: {} };
+
+  function buildTopology() {
+    const gE = el('g-edges'), gR = el('g-rails'), gN = el('g-nodes');
+    gE.textContent = ''; gR.textContent = ''; gN.textContent = '';
+
+    gN.append(Object.assign(mk('text', { x: 8, y: 40, class: 'band' }), { textContent: 'PUBLICAM' }));
+    gN.append(Object.assign(mk('text', { x: 8, y: 452, class: 'band' }), { textContent: 'CONSOMEM' }));
+
+    // barramentos
+    for (const t of TOPICS) {
+      const line = mk('line', { x1: 155, y1: t.y, x2: 965, y2: t.y, class: 'rail' });
+      nodeRefs.rail[t.id] = line;
+      gR.append(line);
+      gR.append(Object.assign(mk('text', { x: 145, y: t.y + 3.5, class: 'topic-name', 'text-anchor': 'end' }), { textContent: t.name }));
+    }
+
+    // produtores → barramento
+    for (const p of PRODUCERS) {
+      const y = railOf(p.topic).y;
+      const edge = mk('path', { d: `M${p.cx},${GEO.prodY + GEO.prodH} L${p.cx},${y}`, class: 'edge', 'marker-end': 'url(#ah)' });
+      gE.append(edge);
+
+      const box = mk('rect', { x: p.x, y: GEO.prodY, width: GEO.prodW, height: GEO.prodH, rx: 4, class: 'node-box' });
+      const name = Object.assign(mk('text', { x: p.cx, y: GEO.prodY + 20, class: 'node-name', 'text-anchor': 'middle' }), { textContent: p.label });
+      const meta = Object.assign(mk('text', { x: p.cx, y: GEO.prodY + 35, class: 'node-meta', 'text-anchor': 'middle' }), { textContent: 'outbox 0' });
+      gN.append(box, name, meta);
+      nodeRefs.prod[p.svc] = { box, meta, edge };
+    }
+
+    // barramento → consumer groups
+    for (const g of GROUPS) {
+      const n = g.subs.length;
+      const spread = Math.min(52, (GEO.consW - 40) / Math.max(1, n - 1) || 0);
+      const start = g.cx - (spread * (n - 1)) / 2;
+      const edges = {};
+      g.subs.forEach((tid, i) => {
+        const x = n === 1 ? g.cx : start + spread * i;
+        const y = railOf(tid).y;
+        const e = mk('path', { d: `M${x},${y} L${x},${GEO.consY}`, class: 'edge', 'marker-end': 'url(#ah)' });
+        edges[tid] = e;
+        gE.append(e);
+      });
+
+      const box = mk('rect', { x: g.x, y: GEO.consY, width: GEO.consW, height: GEO.consH, rx: 4, class: 'node-box' });
+      const name = Object.assign(mk('text', { x: g.cx, y: GEO.consY + 19, class: 'node-name', 'text-anchor': 'middle', 'font-size': '11.5' }), { textContent: g.id });
+      const meta = Object.assign(mk('text', { x: g.cx, y: GEO.consY + 34, class: 'node-meta', 'text-anchor': 'middle' }), { textContent: 'lag 0' });
+      gN.append(box, name, meta);
+      nodeRefs.cons[g.id] = { box, meta, edges };
+    }
+  }
+
+  function updateTopology() {
+    for (const p of PRODUCERS) {
+      const pend = S ? S.services[p.svc].outbox.filter((r) => r.publishedAt === null).length : 0;
+      const total = S ? S.services[p.svc].outbox.length : 0;
+      const r = nodeRefs.prod[p.svc];
+      r.meta.textContent = pend > 0 ? `outbox ${pend} pendente${pend > 1 ? 's' : ''}` : `outbox ${total} · vazio`;
+      r.box.classList.toggle('act', pend > 0);
+      r.edge.classList.toggle('hot', pend > 0);
+    }
+
+    for (const g of GROUPS) {
+      let lag = 0;
+      if (S) {
+        for (const tid of g.subs) {
+          for (let p = 0; p < PARTITIONS; p++) {
+            lag += S.records[tid][p].length - S.offsets[g.id][tid][p];
+          }
+        }
+      }
+      const r = nodeRefs.cons[g.id];
+      r.meta.textContent = lag > 0 ? `lag ${lag}` : 'lag 0 · em dia';
+      r.box.classList.toggle('act', lag > 0);
+      for (const tid of g.subs) {
+        const hot = S ? S.records[tid].some((part, p) => part.length > S.offsets[g.id][tid][p]) : false;
+        r.edges[tid].classList.toggle('hot', hot);
+      }
+    }
+
+    for (const t of TOPICS) {
+      const has = S ? S.records[t.id].some((p) => p.length > 0) : false;
+      nodeRefs.rail[t.id].classList.toggle('hot', has);
+    }
+  }
+
+  /* ── pacotes em voo ────────────────────────────────────────────────── */
+  const TONE = {
+    'order.created': 'var(--accent)', 'order.confirmed': 'var(--ok)', 'order.cancelled': 'var(--crit)',
+    'payment.approved': 'var(--ok)', 'payment.failed': 'var(--crit)', 'payment.refunded': 'var(--comp)',
+    'stock.reserved': 'var(--ok)', 'stock.unavailable': 'var(--crit)', 'stock.released': 'var(--comp)',
+    'shipment.created': 'var(--ok)', 'shipment.failed': 'var(--crit)',
+  };
+
+  function spawnPacket(ev, topic, group) {
+    const prod = PRODUCERS.find((p) => p.topic === topic);
+    if (!prod) return;
+    const railY = railOf(topic).y;
+    const pts = [
+      [prod.cx, GEO.prodY + GEO.prodH],
+      [prod.cx, railY],
+      [group.cx, railY],
+      [group.cx, GEO.consY],
+    ];
+    const dot = mk('circle', { r: reduceMotion ? 4.5 : 5, cx: pts[0][0], cy: pts[0][1] });
+    dot.style.fill = TONE[ev.eventType] || 'var(--accent)';
+    el('g-packets').append(dot);
+    S.packets.push({ dot, pts, born: performance.now(), life: reduceMotion ? 700 : 1150 });
+  }
+
+  function animate(now) {
+    if (S) {
+      for (let i = S.packets.length - 1; i >= 0; i--) {
+        const pk = S.packets[i];
+        const k = (now - pk.born) / pk.life;
+        if (k >= 1) { pk.dot.remove(); S.packets.splice(i, 1); continue; }
+        const t = reduceMotion ? 1 : k;
+        const [x, y] = along(pk.pts, t);
+        pk.dot.setAttribute('cx', x);
+        pk.dot.setAttribute('cy', y);
+        pk.dot.setAttribute('opacity', reduceMotion ? String(1 - k) : (k > 0.88 ? String((1 - k) / 0.12) : '1'));
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+
+  function along(pts, t) {
+    const segs = [];
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      segs.push(d); total += d;
+    }
+    let want = total * Math.min(1, Math.max(0, t));
+    for (let i = 0; i < segs.length; i++) {
+      if (want <= segs[i] || i === segs.length - 1) {
+        const f = segs[i] === 0 ? 0 : want / segs[i];
+        return [
+          pts[i][0] + (pts[i + 1][0] - pts[i][0]) * f,
+          pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f,
+        ];
+      }
+      want -= segs[i];
+    }
+    return pts[pts.length - 1];
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     8. INSPETORES
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  let tab = 'order';
+
+  const FSM = [
+    { s: 'PENDING',          via: 'POST /orders' },
+    { s: 'PAYMENT_APPROVED', via: 'payment.approved' },
+    { s: 'STOCK_RESERVED',   via: 'stock.reserved' },
+    { s: 'CONFIRMED',        via: 'shipment.created' },
+  ];
+
+  function renderInspector() {
+    const box = el('inspector');
+    if (!S) { box.innerHTML = '<p class="empty">Sem execução. Escolha um cenário.</p>'; return; }
+
+    if (tab === 'order') box.innerHTML = viewOrder();
+    else if (tab === 'outbox') box.innerHTML = viewOutbox();
+    else if (tab === 'inbox') box.innerHTML = viewInbox();
+    else if (tab === 'retry') box.innerHTML = viewRetry();
+    else if (tab === 'topics') box.innerHTML = viewTopics();
+    else box.innerHTML = viewEnvelope();
+  }
+
+  function viewOrder() {
+    const o = S.order;
+    const hist = o.history;
+    const terminal = o.status === 'CONFIRMED' || o.status === 'CANCELLED';
+
+    const rows = FSM.map((f) => {
+      const done = hist.includes(f.s) && f.s !== o.status;
+      const now = o.status === f.s;
+      const cls = now ? 'now' : done ? 'done' : '';
+      return `<div class="fsm-step ${cls}"><span class="dot"></span><span class="nm">${f.s}</span><span class="via">${f.via}</span></div>`;
+    });
+
+    if (hist.includes('COMPENSATING')) {
+      const cls = o.status === 'COMPENSATING' ? 'now' : 'comp';
+      const pend = [...o.awaiting];
+      rows.push(`<div class="fsm-step ${cls}"><span class="dot"></span><span class="nm">COMPENSATING</span><span class="via">${pend.length ? 'faltam ' + pend.join(' + ') : 'todas aplicadas'}</span></div>`);
+    }
+    if (o.status === 'CANCELLED') {
+      rows.push(`<div class="fsm-step crit"><span class="dot"></span><span class="nm">CANCELLED</span><span class="via">${o.reason || ''}</span></div>`);
+    }
+
+    const pill = o.status === 'CONFIRMED' ? 'p-sent' : o.status === 'CANCELLED' ? 'p-crit'
+      : o.status === 'COMPENSATING' ? 'p-comp' : 'p-null';
+
+    const stuck = !terminal && S.pending.length === 0 && S.timeline.length > 0;
+
+    return `
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--ink-3)">${o.orderId.slice(-12)}</span>
+          <span class="pill ${pill}">${o.status}</span>
+        </div>
+        <div class="tbl-wrap"><table class="data">
+          <tr><td style="color:var(--ink-3)">total</td><td>${brl(o.cents)}${o.cents % 100 === 13 ? ' <span class="pill p-crit">gatilho .13</span>' : ''}</td></tr>
+          <tr><td style="color:var(--ink-3)">sku</td><td>${esc(o.sku)}${o.sku.startsWith('OUT-') ? ' <span class="pill p-crit">gatilho OUT-</span>' : ''}</td></tr>
+          <tr><td style="color:var(--ink-3)">cep</td><td>${esc(o.zip)}${o.zip.startsWith('00000') ? ' <span class="pill p-crit">gatilho 00000</span>' : ''}</td></tr>
+          <tr><td style="color:var(--ink-3)">partição</td><td>p${o.partition} <span style="color:var(--ink-3)">= hash(orderId) % 3</span></td></tr>
+          <tr><td style="color:var(--ink-3)">correlation</td><td>${esc(o.correlationId)}</td></tr>
+          <tr><td style="color:var(--ink-3)">compensações</td><td>${o.applied.length ? o.applied.join(', ') : '—'}</td></tr>
+        </table></div>
+      </div>
+      <div class="fsm">${rows.join('')}</div>
+      ${stuck ? `<div style="margin:0 14px 14px;padding:10px 12px;border:1px solid var(--warn);background:var(--warn-soft);border-radius:4px;font-size:12.5px;color:var(--warn)">
+        <strong>Saga travada.</strong> Não há mais evento pendente e o pedido não está em estado terminal.
+        Em coreografia ninguém vigia o todo — é exatamente aqui que o sweeper de timeout entra, varrendo
+        pedidos parados e disparando compensação por conta própria.
+      </div>` : ''}`;
+  }
+
+  function viewOutbox() {
+    const rows = [];
+    for (const svc of Object.keys(SVC_LABEL)) {
+      for (const r of S.services[svc].outbox) {
+        rows.push(`<tr class="${r.publishedAt ? 'dim' : ''}">
+          <td>${SVC_LABEL[svc]}</td>
+          <td>${esc(r.ev.eventType)}</td>
+          <td>${r.publishedAt ? '<span class="pill p-sent">publicado</span>' : '<span class="pill p-null">NULL</span>'}</td></tr>`);
+      }
+    }
+    return `
+      <p style="margin:0;padding:11px 14px;font-size:12.5px;color:var(--ink-2);border-bottom:1px solid var(--rule)">
+        Toda linha aqui foi gravada na <strong>mesma transação</strong> do efeito de negócio.
+        <code>published_at NULL</code> é intenção de publicar que sobreviveu ao commit.
+      </p>
+      <div class="tbl-wrap"><table class="data">
+        <thead><tr><th>serviço</th><th>event_type</th><th>published_at</th></tr></thead>
+        <tbody>${rows.join('') || '<tr><td colspan="3" style="color:var(--ink-3)">vazio</td></tr>'}</tbody>
+      </table></div>`;
+  }
+
+  function viewInbox() {
+    const rows = [];
+    for (const svc of Object.keys(SVC_LABEL)) {
+      for (const r of S.services[svc].inbox) {
+        rows.push(`<tr class="${r.applied ? '' : 'hit'}">
+          <td>${esc(r.group)}</td>
+          <td>${esc(r.eventId.slice(-6))}</td>
+          <td>${esc(r.type)}</td>
+          <td>${r.applied ? '<span class="pill p-sent">aplicado</span>' : '<span class="pill p-null">barrado</span>'}</td></tr>`);
+      }
+    }
+    const blocked = rows.filter((r) => r.includes('hit')).length;
+    return `
+      <p style="margin:0;padding:11px 14px;font-size:12.5px;color:var(--ink-2);border-bottom:1px solid var(--rule)">
+        PK composta <code>(event_id, consumer_group)</code>. Note a mesma <code>event_id</code> aparecendo
+        em grupos diferentes — cada um <strong>precisa</strong> processar. Só a repetição dentro do
+        mesmo grupo é barrada.
+        ${blocked ? `<br><strong style="color:var(--warn)">${blocked} entrega${blocked > 1 ? 's' : ''} barrada${blocked > 1 ? 's' : ''}</strong> — efeito de negócio aplicado uma única vez.` : ''}
+      </p>
+      <div class="tbl-wrap"><table class="data">
+        <thead><tr><th>consumer_group</th><th>event_id</th><th>event_type</th><th>resultado</th></tr></thead>
+        <tbody>${rows.join('') || '<tr><td colspan="4" style="color:var(--ink-3)">vazio</td></tr>'}</tbody>
+      </table></div>`;
+  }
+
+  function viewRetry() {
+    const rungs = RETRY_LADDER.map((r, i) => `
+      <div class="rung ${S.ladder[i] > 0 ? 'warm' : ''}">
+        <div class="rl">${r.suffix}</div><div class="rd">atraso ${r.label}</div>
+        <div class="rc">${S.ladder[i]}</div>
+      </div>`).join('');
+
+    const dltRows = S.dlt.map((d) => `
+      <tr><td colspan="2" style="background:var(--panel-2);font-weight:600">${esc(d.ev.eventType)} → ${esc(d.topic)}.${esc(d.group)}.DLT</td></tr>
+      ${Object.entries(d.headers).map(([k, v]) => `<tr><td style="color:var(--ink-3)">${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}`).join('');
+
+    return `
+      <p style="margin:0;padding:11px 14px;font-size:12.5px;color:var(--ink-2);border-bottom:1px solid var(--rule)">
+        Erro <strong>transitório</strong> sobe a escada; erro <strong>permanente</strong> pula direto
+        para a DLT. Cada degrau é um tópico próprio por consumer group — a partição principal nunca trava.
+      </p>
+      <div class="ladder">${rungs}
+        <div class="rung ${S.dlt.length ? 'dead' : ''}" style="flex:0 0 84px">
+          <div class="rl">DLT</div><div class="rd">fim da linha</div>
+          <div class="rc">${S.dlt.length}</div>
+        </div>
+      </div>
+      ${S.dlt.length ? `<div class="tbl-wrap"><table class="data">
+        <thead><tr><th>header</th><th>valor</th></tr></thead><tbody>${dltRows}</tbody></table></div>
+        <p style="margin:0;padding:11px 14px;font-size:12.5px;color:var(--ink-3)">
+          Sem <code>tools/dlq-inspector</code> ninguém abre isto. É assim que uma DLT vira cemitério.
+        </p>` : '<p class="empty">Nenhuma mensagem em retry ou DLT neste cenário.</p>'}`;
+  }
+
+  function viewTopics() {
+    const parts = [];
+    for (const t of TOPICS) {
+      for (let p = 0; p < PARTITIONS; p++) {
+        const n = S.records[t.id][p].length;
+        parts.push(`<tr class="${n ? '' : 'dim'}">
+          <td>${esc(t.name.replace('ecommerce.', ''))}</td>
+          <td class="num">p${p}</td>
+          <td class="num">${n}</td>
+          <td>${n ? S.order.orderId.slice(-6) : '—'}</td></tr>`);
+      }
+    }
+
+    const offs = [];
+    for (const g of GROUPS) {
+      for (const tid of g.subs) {
+        for (let p = 0; p < PARTITIONS; p++) {
+          const total = S.records[tid][p].length;
+          const done = S.offsets[g.id][tid][p];
+          if (total === 0) continue;
+          const lag = total - done;
+          offs.push(`<tr class="${lag ? 'hit' : ''}">
+            <td>${esc(g.id)}</td><td>${esc(tid)}</td><td class="num">p${p}</td>
+            <td class="num">${done}/${total}</td><td class="num">${lag}</td></tr>`);
+        }
+      }
+    }
+
+    return `
+      <p style="margin:0;padding:11px 14px;font-size:12.5px;color:var(--ink-2);border-bottom:1px solid var(--rule)">
+        <code>hash(${S.order.orderId.slice(-6)}) % 3 = p${S.order.partition}</code>.
+        Todos os eventos deste pedido caem na mesma partição de cada tópico — é daí, e só daí,
+        que vem a ordenação por pedido.
+      </p>
+      <div class="tbl-wrap"><table class="data">
+        <thead><tr><th>tópico</th><th>part.</th><th>records</th><th>chave</th></tr></thead>
+        <tbody>${parts.join('')}</tbody></table></div>
+      <div class="phead" style="border-top:1px solid var(--rule)">Offsets commitados</div>
+      <div class="tbl-wrap"><table class="data">
+        <thead><tr><th>group</th><th>tópico</th><th>p</th><th>offset</th><th>lag</th></tr></thead>
+        <tbody>${offs.join('') || '<tr><td colspan="5" style="color:var(--ink-3)">nada consumido ainda</td></tr>'}</tbody>
+      </table></div>`;
+  }
+
+  function viewEnvelope() {
+    if (!S.selected) return '<p class="empty">Clique numa linha da linha do tempo para ver o envelope completo do evento.</p>';
+    const ev = S.selected;
+    const json = JSON.stringify(ev, null, 2)
+      .replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+      .replace(/"([^"]+)":/g, '<span class="k">"$1"</span>:')
+      .replace(/: "([^"]*)"/g, ': <span class="s">"$1"</span>')
+      .replace(/: (\d+)/g, ': <span class="n">$1</span>');
+    const root = ev.causationId === ev.eventId;
+    return `
+      <p style="margin:0;padding:11px 14px;font-size:12.5px;color:var(--ink-2);border-bottom:1px solid var(--rule)">
+        ${root
+          ? '<code>causationId == eventId</code>: este evento é a <strong>raiz</strong> da árvore causal.'
+          : '<code>causationId</code> aponta para o evento que causou este. É como se responde “por que este estorno aconteceu?”.'}
+      </p>
+      <pre class="env">${json}</pre>`;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     9. LINHA DO TEMPO
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  function renderTimeline() {
+    const box = el('timeline');
+    if (!S || S.timeline.length === 0) {
+      box.innerHTML = '<p class="empty">Escolha um cenário à esquerda e aperte <strong>Executar</strong>. Use <strong>Passo</strong> para avançar uma operação por vez — é assim que a ordem entre COMMIT do banco e commit de offset fica visível.</p>';
+      return;
+    }
+    const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
+    box.innerHTML = S.timeline.map((r, i) => `
+      <div class="tl-row" data-i="${i}" role="button" tabindex="0"
+           ${S.selected && r.ev === S.selected ? 'aria-current="true"' : ''}>
+        <span class="tl-t">${r.t}ms</span>
+        <span class="tl-who">${esc(r.who)}</span>
+        <span class="tl-what">${r.html}</span>
+      </div>`).join('');
+    el('tl-count').textContent = `${S.timeline.length} operações · ${S.clock}ms`;
+    if (atBottom) box.scrollTop = box.scrollHeight;
+  }
+
+  function renderBadges() {
+    const pend = S ? Object.keys(SVC_LABEL).reduce((n, s) => n + S.services[s].outbox.filter((r) => !r.publishedAt).length, 0) : 0;
+    const inbox = S ? Object.keys(SVC_LABEL).reduce((n, s) => n + S.services[s].inbox.length, 0) : 0;
+    const rt = S ? S.retry.length + S.dlt.length : 0;
+    el('b-outbox').textContent = pend;
+    el('b-inbox').textContent = inbox;
+    el('b-retry').textContent = rt;
+    el('t-outbox').dataset.tone = pend > 0 ? 'warn' : '';
+    el('t-retry').dataset.tone = S && S.dlt.length ? 'crit' : rt ? 'warn' : '';
+
+    const st = el('topo-status');
+    if (!S) { st.textContent = ''; return; }
+    st.textContent = `${S.order.orderId.slice(-6)} · p${S.order.partition} · ${S.order.status}` +
+      (S.pending.length ? ` · ${S.pending.length} na fila` : ' · fila vazia');
+  }
+
+  function renderAll() {
+    renderTimeline(); renderInspector(); renderBadges(); updateTopology();
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     10. CONTROLES
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  let timer = null, mult = 3;
+
+  function advance() {
+    if (!S || S.pending.length === 0) return false;
+    const fn = S.pending.shift();
+    fn();
+    return true;
+  }
+
+  function stepOnce() {
+    if (!S) { const first = SCENARIOS[0]; launch(first.id); }
+    const moved = advance();
+    if (!moved) stop();
+    renderAll();
+    return moved;
+  }
+
+  function play() {
+    if (!S) launch(SCENARIOS[0].id);
+    if (timer) return;
+    el('btn-play').textContent = '⏸ Pausar';
+    timer = setInterval(() => {
+      if (!advance()) { stop(); renderAll(); return; }
+      renderAll();
+    }, Math.round(460 / mult));
+  }
+
+  function stop() {
+    if (timer) clearInterval(timer);
+    timer = null;
+    el('btn-play').textContent = '▶ Executar';
+  }
+
+  function launch(id) {
+    stop();
+    const scn = SCENARIOS.find((s) => s.id === id);
+    startScenario(scn);
+    S.order.history = ['PENDING'];
+    S.ladder = [0, 0, 0];
+    document.querySelectorAll('.scen').forEach((b) => b.setAttribute('aria-current', String(b.dataset.id === id)));
+    renderAll();
+  }
+
+  function buildLauncher() {
+    const host = el('launcher');
+    let html = '', lastGrp = null;
+    for (const s of SCENARIOS) {
+      if (s.grp !== lastGrp) { html += `<p class="group-label">${esc(s.grp)}</p>`; lastGrp = s.grp; }
+      html += `<button class="scen" type="button" data-id="${s.id}" data-tone="${s.tone}" aria-current="false">
+        <span class="sn">${esc(s.name)}</span><span class="sd">${esc(s.desc)}</span></button>`;
+    }
+    host.innerHTML = html;
+    host.addEventListener('click', (e) => {
+      const b = e.target.closest('.scen');
+      if (b) { launch(b.dataset.id); play(); }
+    });
+  }
+
+  function selectTab(name) {
+    tab = name;
+    document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === name)));
+    renderInspector();
+  }
+
+  /* ── ligação ────────────────────────────────────────────────────────── */
+  buildLauncher();
+  buildTopology();
+  updateTopology();
+
+  el('btn-play').addEventListener('click', () => (timer ? stop() : play()));
+  el('btn-step').addEventListener('click', () => { stop(); stepOnce(); });
+  el('btn-reset').addEventListener('click', () => {
+    stop(); S = null;
+    document.querySelectorAll('.scen').forEach((b) => b.setAttribute('aria-current', 'false'));
+    renderAll();
+  });
+
+  document.querySelectorAll('.spd').forEach((b) => b.addEventListener('click', () => {
+    mult = Number(b.dataset.mult);
+    document.querySelectorAll('.spd').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+    if (timer) { stop(); play(); }
+  }));
+
+  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => selectTab(t.dataset.tab)));
+
+  el('timeline').addEventListener('click', (e) => {
+    const row = e.target.closest('.tl-row');
+    if (!row) return;
+    const r = S.timeline[Number(row.dataset.i)];
+    if (r && r.ev) { S.selected = r.ev; selectTab('env'); renderTimeline(); }
+  });
+  el('timeline').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = e.target.closest('.tl-row');
+    if (!row) return;
+    e.preventDefault();
+    const r = S.timeline[Number(row.dataset.i)];
+    if (r && r.ev) { S.selected = r.ev; selectTab('env'); renderTimeline(); }
+  });
+
+  document.querySelectorAll('[data-run]').forEach((b) => b.addEventListener('click', () => {
+    launch(b.dataset.run);
+    selectTab(b.dataset.tab);
+    play();
+    document.querySelector('.console').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+  }));
+
+  requestAnimationFrame(animate);
+  renderAll();
+})();
+</script>

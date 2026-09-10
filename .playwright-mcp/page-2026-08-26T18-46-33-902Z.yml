@@ -1,0 +1,222 @@
+- generic [ref=f2e2]:
+  - banner [ref=f2e3]:
+    - generic [ref=f2e4]:
+      - generic [ref=f2e5]: Simulador Â· SAGA coreografada sobre Kafka
+      - heading "Console da Saga Coreografada" [level=1] [ref=f2e6]
+      - paragraph [ref=f2e7]: "Dispare um pedido e acompanhe cada passo: a transaÃ§Ã£o que grava o outbox, o relay que publica, o consumer group que faz o poll, o insert no inbox que barra a duplicata, a escada de retry e a DLT. Nada aqui Ã© aleatÃ³rio â€” cada cenÃ¡rio Ã© determinÃstico."
+    - generic [ref=f2e8]:
+      - button "â–¶ Executar" [ref=f2e9] [cursor=pointer]
+      - 'button "â Passo" [ref=f2e10] [cursor=pointer]'
+      - button "â†º Limpar" [ref=f2e11] [cursor=pointer]
+      - group "Velocidade" [ref=f2e12]:
+        - button "1Ã—" [ref=f2e13] [cursor=pointer]
+        - button "3Ã—" [pressed] [ref=f2e14] [cursor=pointer]
+        - button "8Ã—" [ref=f2e15] [cursor=pointer]
+  - generic [ref=f2e16]:
+    - region [ref=f2e17]:
+      - heading "Disparar pedido" [level=2] [ref=f2e18]
+      - generic [ref=f2e19]:
+        - paragraph [ref=f2e20]: Caminhos da saga
+        - button "Caminho feliz R$ 99,80 Â· BOOK-001 Â· 01310-000" [ref=f2e21] [cursor=pointer]:
+          - generic [ref=f2e22]: Caminho feliz
+          - generic [ref=f2e23]: R$ 99,80 Â· BOOK-001 Â· 01310-000
+        - button "Pagamento recusado total termina em .13 â†’ payment.failed" [ref=f2e24] [cursor=pointer]:
+          - generic [ref=f2e25]: Pagamento recusado
+          - generic [ref=f2e26]: total termina em .13 â†’ payment.failed
+        - button "Estoque indisponÃvel SKU OUT-7788 â†’ Payment estorna" [ref=f2e27] [cursor=pointer]:
+          - generic [ref=f2e28]: Estoque indisponÃvel
+          - generic [ref=f2e29]: SKU OUT-7788 â†’ Payment estorna
+        - button "Falha no envio CEP 00000-000 â†’ compensaÃ§Ã£o dupla" [ref=f2e30] [cursor=pointer]:
+          - generic [ref=f2e31]: Falha no envio
+          - generic [ref=f2e32]: CEP 00000-000 â†’ compensaÃ§Ã£o dupla
+        - paragraph [ref=f2e33]: IdempotÃªncia
+        - button "Mensagem duplicada relay publica 2Ã— â†’ inbox barra a 2Âª" [ref=f2e34] [cursor=pointer]:
+          - generic [ref=f2e35]: Mensagem duplicada
+          - generic [ref=f2e36]: relay publica 2Ã— â†’ inbox barra a 2Âª
+        - button "Crash antes do commit de offset reentrega do mesmo record â†’ inbox barra" [ref=f2e37] [cursor=pointer]:
+          - generic [ref=f2e38]: Crash antes do commit de offset
+          - generic [ref=f2e39]: reentrega do mesmo record â†’ inbox barra
+        - paragraph [ref=f2e40]: Retry e DLT
+        - button "Erro transitÃ³rio Inventory falha 2Ã— â†’ recupera em retry-1m" [ref=f2e41] [cursor=pointer]:
+          - generic [ref=f2e42]: Erro transitÃ³rio
+          - generic [ref=f2e43]: Inventory falha 2Ã— â†’ recupera em retry-1m
+        - button "TransitÃ³rio que nÃ£o recupera esgota a escada inteira â†’ DLT" [ref=f2e44] [cursor=pointer]:
+          - generic [ref=f2e45]: TransitÃ³rio que nÃ£o recupera
+          - generic [ref=f2e46]: esgota a escada inteira â†’ DLT
+        - button "Evento invÃ¡lido (schema) erro permanente â†’ DLT direto, sem retry" [ref=f2e47] [cursor=pointer]:
+          - generic [ref=f2e48]: Evento invÃ¡lido (schema)
+          - generic [ref=f2e49]: erro permanente â†’ DLT direto, sem retry
+    - generic [ref=f2e50]:
+      - region "Topologia ao vivo" [ref=f2e51]:
+        - img "Quatro barramentos de tÃ³picos Kafka no centro; os quatro serviÃ§os que publicam acima; os cinco consumer groups abaixo, ligados aos tÃ³picos que assinam." [ref=f2e55]:
+          - generic [ref=f2e57]:
+            - generic [ref=f2e58]: ecommerce.orders.v1
+            - generic [ref=f2e59]: ecommerce.payments.v1
+            - generic [ref=f2e60]: ecommerce.inventory.v1
+            - generic [ref=f2e61]: ecommerce.shipping.v1
+          - generic [ref=f2e62]:
+            - generic [ref=f2e63]: PUBLICAM
+            - generic [ref=f2e64]: CONSOMEM
+            - generic [ref=f2e66]: Order Service
+            - generic [ref=f2e67]: outbox 0 Â· vazio
+            - generic [ref=f2e69]: Payment Service
+            - generic [ref=f2e70]: outbox 0 Â· vazio
+            - generic [ref=f2e72]: Inventory Service
+            - generic [ref=f2e73]: outbox 0 Â· vazio
+            - generic [ref=f2e75]: Shipping Service
+            - generic [ref=f2e76]: outbox 0 Â· vazio
+            - generic [ref=f2e78]: order-projection
+            - generic [ref=f2e79]: lag 0 Â· em dia
+            - generic [ref=f2e81]: payment-service
+            - generic [ref=f2e82]: lag 0 Â· em dia
+            - generic [ref=f2e84]: inventory-service
+            - generic [ref=f2e85]: lag 0 Â· em dia
+            - generic [ref=f2e87]: shipping-service
+            - generic [ref=f2e88]: lag 0 Â· em dia
+            - generic [ref=f2e90]: notification-service
+            - generic [ref=f2e91]: lag 0 Â· em dia
+      - region "Linha do tempo" [ref=f2e92]:
+        - paragraph [ref=f2e96]:
+          - text: Escolha um cenÃ¡rio Ã esquerda e aperte
+          - strong [ref=f2e97]: Executar
+          - text: . Use
+          - strong [ref=f2e98]: Passo
+          - text: para avanÃ§ar uma operaÃ§Ã£o por vez â€” Ã© assim que a ordem entre COMMIT do banco e commit de offset fica visÃvel.
+    - region "Inspetores" [ref=f2e99]:
+      - tablist "Inspetores" [ref=f2e102]:
+        - tab "Pedido" [selected] [ref=f2e103] [cursor=pointer]
+        - tab "Outbox 0" [ref=f2e104] [cursor=pointer]:
+          - text: Outbox
+          - generic [ref=f2e105]: "0"
+        - tab "Inbox 0" [ref=f2e106] [cursor=pointer]:
+          - text: Inbox
+          - generic [ref=f2e107]: "0"
+        - tab "Retry / DLT 0" [ref=f2e108] [cursor=pointer]:
+          - text: Retry / DLT
+          - generic [ref=f2e109]: "0"
+        - tab "Offsets" [ref=f2e110] [cursor=pointer]
+        - tab "Envelope" [ref=f2e111] [cursor=pointer]
+      - paragraph [ref=f2e113]: Sem execuÃ§Ã£o. Escolha um cenÃ¡rio.
+  - region [ref=f2e114]:
+    - heading "Os padrÃµes obrigatÃ³rios" [level=2] [ref=f2e116]
+    - paragraph [ref=f2e117]: Cada um destes existe porque a saga falha de um jeito especÃfico sem ele. O botÃ£o roda o cenÃ¡rio que expÃµe exatamente essa falha â€” e abre o inspetor onde ela aparece.
+    - generic [ref=f2e118]:
+      - article [ref=f2e119]:
+        - heading "Transactional Outbox" [level=3] [ref=f2e120]
+        - paragraph [ref=f2e121]: Gravar no Postgres e publicar no Kafka sÃ£o dois sistemas. Um crash no meio deixa pedido sem evento â€” ou evento sem pedido.
+        - paragraph [ref=f2e122]:
+          - text: O evento Ã© gravado na tabela
+          - code [ref=f2e123]: outbox
+          - strong [ref=f2e124]: na mesma transaÃ§Ã£o
+          - text: do efeito de negÃ³cio. Um relay assÃncrono lÃª
+          - code [ref=f2e125]: WHERE published_at IS NULL
+          - text: com
+          - code [ref=f2e126]: FOR UPDATE SKIP LOCKED
+          - text: ", publica e marca a linha."
+        - paragraph [ref=f2e127]:
+          - text: "O preÃ§o: o relay pode publicar e morrer antes de marcar, republicando na volta. Por isso outbox e idempotÃªncia sÃ£o um"
+          - strong [ref=f2e128]: par
+          - text: â€” usar sÃ³ um dÃ¡ falsa seguranÃ§a.
+        - button "Ver o outbox esvaziando" [ref=f2e129] [cursor=pointer]
+      - article [ref=f2e130]:
+        - heading "Inbox de idempotÃªncia" [level=3] [ref=f2e131]
+        - paragraph [ref=f2e132]: Entrega at-least-once num serviÃ§o de pagamento significa cobrar duas vezes.
+        - paragraph [ref=f2e133]:
+          - code [ref=f2e134]: processed_messages (event_id, consumer_group)
+          - text: com PK composta. O insert acontece na mesma transaÃ§Ã£o do efeito; violaÃ§Ã£o de PK significa "jÃ¡ processei" â†’ rollback, commita o offset, segue.
+        - paragraph [ref=f2e135]:
+          - text: "A chave Ã© composta de propÃ³sito:"
+          - strong [ref=f2e136]: consumer groups distintos precisam processar o mesmo evento
+          - text: . Usar sÃ³
+          - code [ref=f2e137]: event_id
+          - text: faz o segundo consumidor ignorar tudo em silÃªncio.
+        - button "Entregar o mesmo evento 2Ã—" [ref=f2e138] [cursor=pointer]
+      - article [ref=f2e139]:
+        - heading "Retry escalonado + DLT" [level=3] [ref=f2e140]
+        - paragraph [ref=f2e141]: Kafka nÃ£o tem DLQ. Retryar na prÃ³pria partiÃ§Ã£o trava todos os outros pedidos que caÃram nela.
+        - paragraph [ref=f2e142]:
+          - text: Erro Ã©
+          - strong [ref=f2e143]: classificado antes
+          - text: "de retryar: transitÃ³rio sobe a escada"
+          - code [ref=f2e144]: retry-5s â†’ retry-1m â†’ retry-10m
+          - text: ; permanente vai
+          - strong [ref=f2e145]: direto para a DLT
+          - text: ", sem queimar 11 minutos no que nunca vai funcionar."
+        - paragraph [ref=f2e146]:
+          - text: "O preÃ§o Ã© sÃ©rio: desviada para o retry, a mensagem pode ser processada"
+          - strong [ref=f2e147]: depois
+          - text: da seguinte do mesmo pedido. A ordenaÃ§Ã£o daquele pedido morre ali.
+        - button "Subir a escada de retry" [ref=f2e148] [cursor=pointer]
+      - article [ref=f2e149]:
+        - heading "orderId como chave de partiÃ§Ã£o" [level=3] [ref=f2e150]
+        - paragraph [ref=f2e151]: "Sem chave, o produtor distribui em round-robin: o estorno pode ser processado antes da aprovaÃ§Ã£o."
+        - paragraph [ref=f2e152]:
+          - text: A chave de toda mensagem Ã© o
+          - code [ref=f2e153]: orderId
+          - text: . Todos os eventos de um pedido caem na mesma partiÃ§Ã£o, logo sÃ£o ordenados entre si. Entre pedidos diferentes, ordem Ã© irrelevante.
+        - paragraph [ref=f2e154]:
+          - text: Mas a garantia vale
+          - strong [ref=f2e155]: por tÃ³pico
+          - text: . O Order consome trÃªs tÃ³picos e pode ver
+          - code [ref=f2e156]: stock.reserved
+          - text: antes de
+          - code [ref=f2e157]: payment.approved
+          - text: . Nenhuma chave resolve isso â€” sÃ³ a mÃ¡quina de estados monotÃ´nica.
+        - button "Ver partiÃ§Ã£o e offsets" [ref=f2e158] [cursor=pointer]
+      - article [ref=f2e159]:
+        - heading "CompensaÃ§Ã£o" [level=3] [ref=f2e160]
+        - paragraph [ref=f2e161]: O envio falhou, mas o pagamento jÃ¡ foi autorizado e o estoque jÃ¡ foi reservado. AlguÃ©m precisa desfazer.
+        - paragraph [ref=f2e162]:
+          - text: Em coreografia nÃ£o hÃ¡ quem mande desfazer. O Payment assina
+          - code [ref=f2e163]: ecommerce.shipping.v1
+          - text: e estorna por conta prÃ³pria; o Inventory assina o mesmo tÃ³pico e libera o estoque.
+          - strong [ref=f2e164]: CompensaÃ§Ã£o dupla e paralela.
+        - paragraph [ref=f2e165]:
+          - text: "Repare no acoplamento: o Payment precisa conhecer as falhas de"
+          - strong [ref=f2e166]: todos
+          - text: os passos posteriores. Acrescentar uma 5Âª etapa obriga a mexer em todos os serviÃ§os anteriores.
+        - button "ForÃ§ar compensaÃ§Ã£o dupla" [ref=f2e167] [cursor=pointer]
+      - article [ref=f2e168]:
+        - heading "Fail secure" [level=3] [ref=f2e169]
+        - paragraph [ref=f2e170]:
+          - text: Um
+          - code [ref=f2e171]: catch
+          - text: que libera estoque ou aprova pagamento "porque deu erro" Ã© o pior bug possÃvel.
+        - paragraph [ref=f2e172]:
+          - text: Erro desconhecido
+          - strong [ref=f2e173]: nÃ£o commita o offset
+          - text: . A mensagem volta, sobe a escada e termina na DLT. Estado indeterminado nunca vira estado favorÃ¡vel ao cliente.
+        - paragraph [ref=f2e174]: "O efeito colateral: a DLT acumula. Sem ferramenta de reprocessamento ela vira cemitÃ©rio â€” ninguÃ©m abre um tÃ³pico com 4 mil mensagens sem CLI."
+        - button "Enviar evento invÃ¡lido" [ref=f2e175] [cursor=pointer]
+    - 'figure "A diferenÃ§a Ã© uma sÃ³: sem outbox, a intenÃ§Ã£o de publicar vive fora da transaÃ§Ã£o e desaparece com o processo. Com outbox, ela Ã© uma linha gravada junto do pedido, e publicar passa a ser um segundo problema â€” resolvÃvel, porque a intenÃ§Ã£o sobreviveu." [ref=f2e177]':
+      - 'img "Ã€ esquerda, sem outbox: o serviÃ§o commita no Postgres e o publish no Kafka nunca acontece se o processo morre entre os dois. Ã€ direita, com outbox: uma Ãºnica transaÃ§Ã£o grava o pedido e a linha de outbox, e um relay separado publica depois." [ref=f2e178]':
+        - generic [ref=f2e179]: SEM OUTBOX
+        - generic [ref=f2e181]: handler
+        - generic [ref=f2e182]: 1. COMMIT
+        - generic [ref=f2e184]: Postgres
+        - generic [ref=f2e185]: pedido gravado
+        - generic [ref=f2e186]: processo morre aqui
+        - generic [ref=f2e187]: 2. publish
+        - generic [ref=f2e189]: Kafka
+        - generic [ref=f2e190]: evento nunca sai
+        - generic [ref=f2e191]: Pedido existe, saga nunca comeÃ§a.
+        - generic [ref=f2e192]: NinguÃ©m percebe atÃ© o cliente ligar.
+        - generic [ref=f2e193]: COM OUTBOX
+        - generic [ref=f2e195]: handler
+        - generic [ref=f2e197]: UMA transaÃ§Ã£o
+        - generic [ref=f2e198]: INSERT pedido
+        - generic [ref=f2e199]: INSERT outbox
+        - generic [ref=f2e200]: SKIP LOCKED
+        - generic [ref=f2e202]: relay (assÃncrono)
+        - generic [ref=f2e204]: Kafka
+        - generic [ref=f2e205]: Ou os dois existem, ou nenhum.
+        - generic [ref=f2e206]: "Custo: latÃªncia do relay, e publicaÃ§Ã£o"
+        - generic [ref=f2e207]: at-least-once â€” exige idempotÃªncia.
+  - contentinfo [ref=f2e209]:
+    - generic [ref=f2e210]: SimulaÃ§Ã£o determinÃstica â€” mesmo cenÃ¡rio, mesmo resultado, sempre.
+    - generic [ref=f2e211]:
+      - text: Contratos reais em
+      - code [ref=f2e212]: packages/contracts
+      - text: ; decisÃµes em
+      - code [ref=f2e213]: docs/adr/
+      - text: .
