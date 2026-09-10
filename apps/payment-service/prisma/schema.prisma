@@ -1,5 +1,15 @@
 generator client {
   provider = "prisma-client-js"
+  // Output dedicado: sem isto, o client gerado vai para o local padrão
+  // `node_modules/@prisma/client`, que o pnpm resolve para a MESMA entrada
+  // física do store de conteúdo endereçável para todo pacote que dependa de
+  // `@prisma/client` na mesma versão — inclusive o Order Service, que tem um
+  // schema diferente. `prisma generate` aqui sobrescreveria o client do Order
+  // Service (e vice-versa), quebrando o typecheck de um serviço sempre que o
+  // outro rodasse `prisma generate` por último. `**/prisma/generated/` já
+  // está no .gitignore da raiz do monorepo — a convenção é isolar o client
+  // gerado por serviço.
+  output = "./generated"
 }
 
 datasource db {
