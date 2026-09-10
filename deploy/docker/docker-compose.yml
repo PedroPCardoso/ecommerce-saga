@@ -208,6 +208,114 @@ services:
       - ../../docs/architecture:/usr/local/structurizr
     networks: [saga]
 
+  # ------------------------------------------------------------- serviços ---
+  order-service:
+    build:
+      context: ../..
+      dockerfile: apps/order-service/Dockerfile
+    container_name: ecommerce-order-service
+    restart: unless-stopped
+    ports: ['3000:3000']
+    environment:
+      NODE_ENV: production
+      ORDER_SERVICE_PORT: '3000'
+      ORDER_DATABASE_URL: postgresql://order_svc:changeme@postgres-order:5432/order_db?schema=public
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID_PREFIX: ecommerce
+      JWT_SECRET: dev-only-not-a-real-secret-change-me
+      JWT_ISSUER: ecommerce-local
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres-order:
+        condition: service_healthy
+    networks: [saga]
+
+  payment-service:
+    build:
+      context: ../..
+      dockerfile: apps/payment-service/Dockerfile
+    container_name: ecommerce-payment-service
+    restart: unless-stopped
+    ports: ['3001:3001']
+    environment:
+      NODE_ENV: production
+      PAYMENT_SERVICE_PORT: '3001'
+      PAYMENT_DATABASE_URL: postgresql://payment_svc:changeme@postgres-payment:5432/payment_db?schema=public
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID_PREFIX: ecommerce
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres-payment:
+        condition: service_healthy
+    networks: [saga]
+
+  inventory-service:
+    build:
+      context: ../..
+      dockerfile: apps/inventory-service/Dockerfile
+    container_name: ecommerce-inventory-service
+    restart: unless-stopped
+    ports: ['3002:3002']
+    environment:
+      NODE_ENV: production
+      INVENTORY_SERVICE_PORT: '3002'
+      INVENTORY_DATABASE_URL: postgresql://inventory_svc:changeme@postgres-inventory:5432/inventory_db?schema=public
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID_PREFIX: ecommerce
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres-inventory:
+        condition: service_healthy
+    networks: [saga]
+
+  shipping-service:
+    build:
+      context: ../..
+      dockerfile: apps/shipping-service/Dockerfile
+    container_name: ecommerce-shipping-service
+    restart: unless-stopped
+    ports: ['3003:3003']
+    environment:
+      NODE_ENV: production
+      SHIPPING_SERVICE_PORT: '3003'
+      SHIPPING_DATABASE_URL: postgresql://shipping_svc:changeme@postgres-shipping:5432/shipping_db?schema=public
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID_PREFIX: ecommerce
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres-shipping:
+        condition: service_healthy
+    networks: [saga]
+
+  notification-service:
+    build:
+      context: ../..
+      dockerfile: apps/notification-service/Dockerfile
+    container_name: ecommerce-notification-service
+    restart: unless-stopped
+    ports: ['3004:3004']
+    environment:
+      NODE_ENV: production
+      NOTIFICATION_SERVICE_PORT: '3004'
+      NOTIFICATION_DATABASE_URL: postgresql://notification_svc:changeme@postgres-notification:5432/notification_db?schema=public
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID_PREFIX: ecommerce
+      SMTP_HOST: mailhog
+      SMTP_PORT: '1025'
+      SMTP_FROM: no-reply@example.com
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres-notification:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    networks: [saga]
+
 networks:
   saga:
     driver: bridge
