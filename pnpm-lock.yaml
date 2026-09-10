@@ -98,6 +98,22 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)
 
+  packages/kafka:
+    dependencies:
+      '@ecommerce/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)
+
   packages/outbox:
     dependencies:
       pg:
