@@ -5,6 +5,7 @@ import {
   addressSchema,
   amountCentsSchema,
   cancellationReasonSchema,
+  compensationTypeSchema,
   currencySchema,
   orderItemSchema,
 } from '../common.js';
@@ -51,7 +52,7 @@ export const orderCancelled = defineEvent({
      * Compensações que o Order Service esperou antes de fechar o cancelamento.
      * É a prova de que a saga desfez o que fez — e o que você vai olhar no post-mortem.
      */
-    compensationsApplied: z.array(z.enum(['PAYMENT_REFUNDED', 'STOCK_RELEASED'])),
+    compensationsApplied: z.array(compensationTypeSchema),
     cancelledAt: z.string().datetime({ offset: true }),
   }),
 });
