@@ -1,7 +1,9 @@
 # SAGA coreografada sobre Kafka — repositório de estudos
 
 Cinco microserviços NestJS coordenando um pedido de e-commerce **sem orquestrador
-central**, com Docker e Kubernetes, documentado em C4.
+central**, com Docker e Kubernetes, documentado em C4 — mais um painel de observação
+ao vivo da saga (`saga-observer`) e um harness isolado que implementa a MESMA saga via
+orquestração, só para comparar (`saga-orchestrator-service`, [ADR-0012](docs/adr/0012-comparacao-orquestracao-vs-coreografia.md)).
 
 O objetivo não é ter o código pronto: é entender por que cada peça existe, o que ela
 custa, e como cada uma falha quando você erra. Por isso o repositório tem três coisas que
@@ -26,17 +28,17 @@ POST /orders
     └─► order.created ──► Payment autoriza
                               ├── payment.failed ─────────────────────────► CANCELLED
                               └── payment.approved ──► Inventory reserva
-                                                          ├── stock.unavailable ──► Payment ESTORNA* ──► CANCELLED
+                                                          ├── stock.unavailable ──► Payment ESTORNA ──► CANCELLED
                                                           └── stock.reserved ──► Shipping etiqueta
-                                                                                     ├── shipment.failed ──► Payment ESTORNA*
-                                                                                     │                    └► Inventory LIBERA* ──► CANCELLED
+                                                                                     ├── shipment.failed ──► Payment ESTORNA
+                                                                                     │                    └► Inventory LIBERA ──► CANCELLED
                                                                                      └── shipment.created ──► CONFIRMED
 ```
 
 Ninguém comanda. Cada serviço reage a eventos e publica o que aconteceu no seu domínio.
-
-\* **Estorno/liberação (compensação) ainda não estão implementados** — ver "Estado
-atual" mais abaixo. Hoje esses dois ramos param em `COMPENSATING`, não em `CANCELLED`.
+Além do sweeper de timeout (Order Service) publicando `saga.timeout` para pedidos presos
+em `PAYMENT_APPROVED` sem resposta do Inventory — mais um gatilho de estorno, mesmo
+caminho de `CANCELLED`.
 
 ## O ponto do exercício
 
@@ -118,19 +120,20 @@ por vez: é assim que se vê que o commit de offset acontece _depois_ do COMMIT 
 docs/aprender/         os 10 módulos — comece aqui
 docs/simulator/        o console interativo da saga (HTML, abre no navegador)
 docs/adr/              as 11 decisões, em MADR, com as consequências negativas escritas
-docs/architecture/     modelo C4 em Structurizr DSL (1 modelo → 4 níveis)
+docs/architecture/     modelo C4 em Structurizr DSL (Contexto, Contêineres, Componentes do Order Service — nível 4/máquina de estados fica no ASCII do §1 acima, de propósito)
 docs/PLAN.md           plano de execução completo, 13 fases
 
 examples/              6 exemplos executáveis contra Kafka e Postgres reais
 
-packages/contracts/    fonte ÚNICA dos contratos de evento e da topologia Kafka
-packages/kafka/        consumo com commit manual, retry escalonado, DLT      (Fase 2)
-packages/outbox/       Transactional Outbox + relay                          (Fase 2)
-packages/idempotency/  tabela de inbox + decorator @Idempotent               (Fase 2)
-apps/                  os 5 serviços                                     (Fases 1 a 5)
-deploy/docker/         infra local
-deploy/k8s|helm/       Kubernetes                                          (Fase 10)
-tools/dlq-inspector/   CLI para inspecionar e reprocessar a DLT              (Fase 6)
+packages/contracts/      fonte ÚNICA dos contratos de evento e da topologia Kafka
+packages/kafka/          consumo com commit manual, retry escalonado, DLT, tracing (Fase 2/7)
+packages/outbox/         Transactional Outbox + relay + métrica de lag             (Fase 2/7)
+packages/idempotency/    tabela de inbox + markProcessed() dentro da transação     (Fase 2)
+packages/observability/  tracing manual (traceparent), métricas Prometheus, logger (Fase 7)
+apps/                    5 serviços de negócio (Fases 1-5) + saga-observer (7b) + saga-orchestrator-service (11, harness de comparação isolado)
+deploy/docker/           infra local
+deploy/k8s/base/         Kubernetes — manifests crus                            (Fase 10)
+tools/dlq-inspector/     CLI para inspecionar e reprocessar a DLT                (Fase 6)
 ```
 
 Serviço **nunca** declara o schema de um evento que consome — importa de
@@ -162,22 +165,25 @@ usar nenhum — o exemplo 03 mostra exatamente por quê.
 - [x] **Fase 2** — `packages/kafka` e `packages/idempotency`
 - [x] **Fases 3–5** — Payment, Inventory, Shipping, Notification (caminho feliz e `payment.failed` completos, ponta a ponta, contra Kafka/Postgres reais)
 - [x] **Fase 9** — Docker de produção (5 imagens multi-stage, non-root, 0 CVE HIGH/CRITICAL, docker-compose integrado)
-- [ ] **Fase 6** — resiliência, caos, replay, `dlq-inspector`
-- [ ] **Fase 7** — observabilidade · **7b** — Saga Observer (a UI ligada ao sistema real)
-- [ ] **Fase 8** — C4 nível 3
-- [ ] **Fase 10** — Kubernetes / Minikube
-- [ ] **Fase 11** — versão orquestrada, para comparação (opcional)
+- [x] **Fase 6** — resiliência, caos, replay, `dlq-inspector`
+- [x] **Fase 7** — observabilidade (tracing + métricas nos 5 serviços) · **7b** — `apps/saga-observer`: 6º serviço, só-consumidor, projeta a saga em memória e expõe via SSE (`GET /api/orders`, `GET /api/orders/stream`) um front estático (`public/index.html`) que mostra cada evento chegando ao vivo
+- [x] **Fase 8** — C4 nível 3 (componentes do Order Service, nomeados como as classes reais)
+- [~] **Fase 10** — Kubernetes / Minikube: manifests crus (10a) escritos e commitados, CloudNativePG provado ao vivo, Strimzi Kafka **bloqueado** nesta rodada — ver [seção dedicada](#kubernetes-fase-10) abaixo
+- [x] **Fase 11** — versão orquestrada, para comparação — harness isolado (`apps/saga-orchestrator-service`, banco e tópicos próprios, não toca nos 5 serviços de produção) + [ADR-0012](docs/adr/0012-comparacao-orquestracao-vs-coreografia.md) com números medidos (latência, LoC, serviços tocados)
 
-**Limitação conhecida e deliberada:** a matriz de compensação (`payment.refunded`,
-`stock.released` — ver [módulo 08](docs/aprender/08-compensacao.md) e
-`COMPENSATION_MATRIX` em `packages/contracts/src/registry.ts`) ainda não está
-implementada em nenhum serviço. Um pedido que falha em `stock.unavailable` ou
-`shipment.failed` avança para `COMPENSATING` e **fica lá** — de propósito: fechar o
-pedido como `CANCELLED` sem a compensação ter de fato acontecido seria mentir no
-histórico do pedido. `payment.failed` (nada foi efetivado ainda) fecha normalmente em
-`CANCELLED`. Isso significa que hoje não há nada — humano ou automático — vigiando
-pedidos presos em `COMPENSATING`; é o próximo trabalho antes de a Fase 6 (DLQ/replay)
-fazer sentido.
+**Matriz de compensação (I4) — implementada.** `payment.refunded` (Payment Service,
+reagindo a `stock.unavailable`/`shipment.failed`/`saga.timeout`) e `stock.released`
+(Inventory Service, reagindo a `shipment.failed`) fecham o pedido em `CANCELLED` de
+verdade — `stock.unavailable` só precisa do estorno; `shipment.failed` precisa dos
+DOIS (estorno **e** liberação de estoque, em qualquer ordem) antes de fechar. Ver
+[módulo 08](docs/aprender/08-compensacao.md) e `COMPENSATION_MATRIX` em
+`packages/contracts/src/registry.ts`.
+
+**Sweeper de timeout (Fase 6) — implementado.** `SagaTimeoutSweeperService` (Order
+Service) varre pedidos presos em `PAYMENT_APPROVED` além do limite configurado e
+publica `saga.timeout`, que o Payment Service consome como mais um gatilho de estorno.
+`tools/dlq-inspector` lista, inspeciona (com mascaramento de PII) e reprocessa
+mensagens da DLT.
 
 ---
 
@@ -192,3 +198,122 @@ stacktrace carrega payload e payload carrega PII.
 
 A revisão OWASP Top 10:2025 completa está na seção 8 do [plano](docs/PLAN.md), e o módulo
 [10](docs/aprender/10-do-docker-ao-kubernetes.md) cobre o que muda ao ir para o cluster.
+
+**Escopo reduzido, deliberado, do `saga-observer` (Fase 7b):** o painel em
+`http://localhost:3005` **não tem autenticação, não tem papel de operador, e não permite
+reprocessar a DLT nem consultar um endpoint `/internal/saga-debug/:orderId` por serviço** —
+qualquer coisa nessa rede local enxerga o painel. Isso é intencional: as três coisas juntas
+(auth + RBAC + audit log de quem reprocessou o quê) criam uma superfície administrativa nova
+que merece revisão de segurança dedicada, fora do escopo desta fase. Pelo mesmo motivo, o
+que o SSE expõe é só `{ orderId, eventType, status, occurredAt }` — nunca `customerId`,
+endereço, dado de pagamento ou qualquer outro campo de `payload` (A01/A09). Ver
+`docs/superpowers/plans/2026-09-18-fase7b-saga-observer.md` (Global Constraints).
+
+---
+
+## Kubernetes (Fase 10)
+
+Manifests crus (sem Helm) em `deploy/k8s/base/` — `Namespace` único (`ecommerce-saga`),
+`Cluster` CloudNativePG com 5 databases lógicos, `Kafka` CR do Strimzi (KRaft, nó único),
+80 `KafkaTopic` CRs gerados por script a partir de `packages/contracts` (nunca escritos à
+mão), um `Deployment`+`Service`+`ConfigMap`+`Secret`+`NetworkPolicy`+`PodDisruptionBudget`
+por serviço de negócio, `Ingress` só para o Order Service, e um `ScaledObject` de exemplo do
+KEDA. Ver `docs/superpowers/plans/2026-09-18-fase10-kubernetes.md` para o plano completo,
+incluindo os Global Constraints (RAM do Docker local limitada a 7.8GB — por isso um único
+`Cluster` Postgres com 5 databases em vez de 5 clusters, e Helm/10b e o teste de carga do
+KEDA ficaram deliberadamente fora do escopo).
+
+### Como subir
+
+```bash
+brew install minikube helm
+docker compose -f deploy/docker/docker-compose.yml down   # as duas infras não cabem juntas na RAM local
+minikube start --driver=docker --memory=6144 --cpus=4 --disk-size=30g
+minikube addons enable ingress
+minikube addons enable metrics-server
+kubectl create namespace ecommerce-saga
+kubectl config set-context --current --namespace=ecommerce-saga
+
+helm repo add strimzi https://strimzi.io/charts/
+helm repo add cnpg https://cloudnative-pg.github.io/charts
+helm repo add kedacore https://kedacore.github.io/charts
+helm repo update
+helm install strimzi-operator strimzi/strimzi-kafka-operator --namespace ecommerce-saga
+helm install cnpg-operator cnpg/cloudnative-pg --namespace ecommerce-saga
+helm install keda kedacore/keda --namespace ecommerce-saga
+
+kubectl apply -f deploy/k8s/base/postgres/cluster.yaml
+kubectl create secret generic saga-postgres-order-svc-credentials -n ecommerce-saga \
+  --from-literal=username=order_svc --from-literal=password=changeme   # NUNCA committar isto com valor real
+kubectl apply -f deploy/k8s/base/postgres/init-databases-job.yaml
+kubectl apply -f deploy/k8s/base/kafka/kafka-cluster.yaml
+
+# imagens: o daemon Docker do minikube é separado do daemon do host —
+# builde no host (docker compose já faz isso no dia a dia) e importe com
+# `minikube image load ecommerce-saga-<serviço>:latest` para cada um dos 5
+# (o `docker build` via `eval $(minikube docker-env)` NÃO funciona neste
+# minikube — ver "O que ficou bloqueado" abaixo).
+
+kubectl apply -f deploy/k8s/base/services/<serviço>.yaml   # um de cada vez, com o Job de migration antes
+kubectl apply -f deploy/k8s/base/ingress.yaml
+kubectl apply -f deploy/k8s/base/keda/
+```
+
+### O que foi PROVADO ao vivo nesta rodada
+
+- **Operators via Helm**: Strimzi, CloudNativePG e KEDA sobem `Running` em minutos.
+- **CloudNativePG**: `Cluster` de 1 instância fica `Cluster in healthy state` em segundos;
+  o Job de init cria os outros 4 databases/roles (`payment_db`, `inventory_db`,
+  `shipping_db`, `notification_db`) com sucesso, confirmado via `psql \l`.
+- **Build de imagem para o minikube**: `docker build` clássico direto no daemon do
+  minikube (`eval $(minikube docker-env)`) gera uma imagem "fantasma" — aparece em
+  `docker images` mas `docker run` falha com "Unable to find image locally" (o runtime
+  containerd experimental do minikube não populra o content store corretamente por esse
+  caminho). O caminho que funciona: build no Docker do host (`docker compose build`,
+  como já é feito no dia a dia) + `minikube image load <imagem>:latest` por serviço —
+  confirmado com as 5 imagens de serviço.
+- **`/health/ready` e `/health/startup`**: implementados e testados (Task 1 da Fase 10)
+  nos 5 serviços de negócio — checam Postgres via `SELECT 1`; `saga-observer` devolve
+  `{ status: 'ok' }` direto (sem dependência própria).
+
+### O que ficou BLOQUEADO nesta rodada
+
+**Strimzi Kafka (KRaft, nó único) não estabiliza neste minikube.** O broker/controller
+combinado entra em crash loop recorrente (~span de 1–6 min de uptime, depois
+`java.lang.RuntimeException: Received a fatal error while waiting for the controller to
+acknowledge that we are caught up`, causado por `UnknownHostException`/`ECONNREFUSED` ao
+tentar se auto-registrar via o próprio nome DNS do headless service
+`saga-kafka-saga-pool-0.saga-kafka-kafka-brokers.ecommerce-saga.svc`). Tentativas feitas,
+nesta ordem, todas commitadas nos manifests como a versão final usada:
+
+1. `Kafka.spec.kafka.version` do plano original (3.9.0) não é suportado pelo operator
+   Strimzi que o Helm instala hoje (1.2.0 — só aceita 4.2.x/4.3.x); corrigido para 4.3.1.
+2. `spec.kafka.resources` migrou para `spec.resources` no `KafkaNodePool` nesta versão do
+   Strimzi (Kafka CR rejeita o campo); corrigido.
+3. Suba de CPU do node pool (1 → 2 CPU) — melhorou mas não eliminou os restarts.
+4. Timeouts do quorum KRaft afrouxados (`controller.quorum.request/election/fetch.timeout.ms`)
+   — mesmo resultado.
+5. `dnsConfig.options.ndots: '2'` no template do pod, mirando a race de resolução DNS
+   vista nos logs do CoreDNS (NXDOMAIN nos primeiros domínios de busca antes do FQDN
+   correto responder) — mesmo resultado.
+
+Uso real de CPU/memória do pod em todo esse tempo ficou bem abaixo dos limites (161m de
+2000m, 401Mi de 2Gi) — ou seja, **não é falta de recursos**; é uma instabilidade de rede/DNS
+mais fundamental deste minikube específico (driver Docker sobre o daemon do
+[OrbStack](https://orbstack.dev/) desta máquina) com o auto-registro do controller KRaft
+combinado em nó único desta versão do Strimzi. Como consequência em cascata, os 5 serviços
+de negócio também entram em crash loop ao subir: o `OutboxRelayService`/consumer Kafka de
+cada um falha ao conectar durante o `onModuleInit`, o que hoje derruba o bootstrap inteiro
+do Nest (não é um problema de Postgres — Postgres respondeu normalmente o tempo todo nos
+testes feitos à parte).
+
+**Por isso, a Task 8 do plano (saga real via Ingress + resiliência a pod kill) não pôde
+ser executada nesta rodada** — sem um broker Kafka estável não há saga para provar.
+Helm (10b) e o teste de carga de 5k pedidos do KEDA já estavam fora de escopo desde o
+início (ver Global Constraints do plano) e continuam não tentados.
+
+**Próximo passo sugerido:** tentar uma versão mais antiga e mais amplamente testada do
+Strimzi (ex. a família 0.4x, compatível com Kafka 3.x, como o plano original previa) em vez
+da 1.2.0 mais recente puxada pelo Helm hoje, ou trocar o driver do minikube (`--driver=hyperkit`
+ou testar fora do daemon do OrbStack) para isolar se a causa é o driver Docker específico
+desta máquina.

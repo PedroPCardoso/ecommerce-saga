@@ -20,6 +20,30 @@ describe('catálogo de eventos (contrato)', () => {
     expect(catalog).toMatchInlineSnapshot(`
       [
         {
+          "aggregateType": "orchestratedOrder",
+          "topic": "ecommerce.commands.inventory.v1",
+          "type": "command.inventory.reserve-stock",
+          "version": 1,
+        },
+        {
+          "aggregateType": "orchestratedOrder",
+          "topic": "ecommerce.commands.payment.v1",
+          "type": "command.payment.authorize",
+          "version": 1,
+        },
+        {
+          "aggregateType": "orchestratedOrder",
+          "topic": "ecommerce.commands.shipping.v1",
+          "type": "command.shipping.create-shipment",
+          "version": 1,
+        },
+        {
+          "aggregateType": "orchestratedOrder",
+          "topic": "ecommerce.responses.orchestrator.v1",
+          "type": "orchestrator.executor-responded",
+          "version": 1,
+        },
+        {
           "aggregateType": "order",
           "topic": "ecommerce.orders.v1",
           "type": "order.cancelled",
@@ -53,6 +77,12 @@ describe('catálogo de eventos (contrato)', () => {
           "aggregateType": "payment",
           "topic": "ecommerce.payments.v1",
           "type": "payment.refunded",
+          "version": 1,
+        },
+        {
+          "aggregateType": "order",
+          "topic": "ecommerce.orders.v1",
+          "type": "saga.timeout",
           "version": 1,
         },
         {

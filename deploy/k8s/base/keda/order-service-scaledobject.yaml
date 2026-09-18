@@ -1,0 +1,17 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: order-service-scaler
+  namespace: ecommerce-saga
+spec:
+  scaleTargetRef: { name: order-service }
+  minReplicaCount: 2
+  maxReplicaCount: 8
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: saga-kafka-kafka-bootstrap:9092
+        consumerGroup: order-projection
+        topic: ecommerce.payments.v1
+        lagThreshold: '50'
+        allowIdleConsumers: 'true'

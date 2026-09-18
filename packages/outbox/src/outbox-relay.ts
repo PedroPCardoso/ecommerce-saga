@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { outboxLagSeconds } from '@ecommerce/observability';
 
 export interface OutboxEnvelopeRow {
   id: string;
@@ -12,6 +13,7 @@ export type PublishFn = (row: OutboxEnvelopeRow) => Promise<void>;
 export interface OutboxRelayOptions {
   pool: Pool;
   publish: PublishFn;
+  serviceName: string;
   pollIntervalMs?: number;
   batchSize?: number;
   onError?: (error: unknown, row: OutboxEnvelopeRow) => void;
@@ -26,6 +28,7 @@ export interface OutboxRelayOptions {
 export class OutboxRelay {
   private readonly pool: Pool;
   private readonly publishFn: PublishFn;
+  private readonly serviceName: string;
   private readonly pollIntervalMs: number;
   private readonly batchSize: number;
   private readonly onError: (error: unknown, row: OutboxEnvelopeRow) => void;
@@ -35,6 +38,7 @@ export class OutboxRelay {
   constructor(opts: OutboxRelayOptions) {
     this.pool = opts.pool;
     this.publishFn = opts.publish;
+    this.serviceName = opts.serviceName;
     this.pollIntervalMs = opts.pollIntervalMs ?? 200;
     this.batchSize = opts.batchSize ?? 100;
     this.onError =
@@ -85,8 +89,9 @@ export class OutboxRelay {
         event_id: string;
         payload: unknown;
         headers: Record<string, string>;
+        created_at: string;
       }>(
-        `SELECT id, event_id, payload, headers
+        `SELECT id, event_id, payload, headers, created_at
            FROM outbox
           WHERE published_at IS NULL
           ORDER BY created_at
@@ -94,6 +99,16 @@ export class OutboxRelay {
           FOR UPDATE SKIP LOCKED`,
         [this.batchSize],
       );
+
+      if (rows.length > 0) {
+        const oldestCreatedAt = rows.reduce(
+          (oldest, row) => (row.created_at < oldest ? row.created_at : oldest),
+          rows[0]!.created_at,
+        );
+        outboxLagSeconds.set({ service: this.serviceName }, (Date.now() - new Date(oldestCreatedAt).getTime()) / 1000);
+      } else {
+        outboxLagSeconds.set({ service: this.serviceName }, 0);
+      }
 
       if (rows.length === 0) {
         await client.query('COMMIT');

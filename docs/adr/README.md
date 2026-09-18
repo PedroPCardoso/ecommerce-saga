@@ -17,3 +17,4 @@ Regra do projeto: **escreva o ADR antes de implementar**. Se você não consegue
 | [0009](0009-orderid-como-chave-de-particao.md)         | `orderId` como chave de partição             | Aceito |
 | [0010](0010-contratos-json-com-zod.md)                 | Contratos JSON validados com Zod             | Aceito |
 | [0011](0011-dinheiro-em-centavos.md)                   | Dinheiro como inteiro em centavos            | Aceito |
+| [0012](0012-comparacao-orquestracao-vs-coreografia.md) | Comparação orquestração vs. coreografia (Fase 11) | Aceito |

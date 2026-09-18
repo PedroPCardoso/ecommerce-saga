@@ -5,12 +5,14 @@ import * as orderEvents from './events/order.js';
 import * as paymentEvents from './events/payment.js';
 import * as inventoryEvents from './events/inventory.js';
 import * as shippingEvents from './events/shipping.js';
+import * as orchestrationEvents from './events/orchestration.js';
 
 export const EVENTS = {
   ...orderEvents,
   ...paymentEvents,
   ...inventoryEvents,
   ...shippingEvents,
+  ...orchestrationEvents,
 } as const;
 
 /**
@@ -36,6 +38,7 @@ export const EVENT_DEFINITIONS: readonly AnyEventDefinition[] = (
     ...Object.values(paymentEvents),
     ...Object.values(inventoryEvents),
     ...Object.values(shippingEvents),
+    ...Object.values(orchestrationEvents),
   ] as readonly unknown[]
 )
   .filter(isEventDefinition)

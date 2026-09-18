@@ -10,6 +10,16 @@ export const TOPICS = {
   payments: 'ecommerce.payments.v1',
   inventory: 'ecommerce.inventory.v1',
   shipping: 'ecommerce.shipping.v1',
+  /**
+   * Tópicos do harness de comparação orquestrada (Fase 11, ADR-0012) — isolados dos
+   * tópicos de negócio acima. Nenhum dos 5 serviços de produção assina ou publica
+   * nestes tópicos; só `apps/saga-orchestrator-service` (orquestrador + executores
+   * "burros" simulados no mesmo processo).
+   */
+  commandsPayment: 'ecommerce.commands.payment.v1',
+  commandsInventory: 'ecommerce.commands.inventory.v1',
+  commandsShipping: 'ecommerce.commands.shipping.v1',
+  responsesOrchestrator: 'ecommerce.responses.orchestrator.v1',
 } as const;
 
 export type BusinessTopic = (typeof TOPICS)[keyof typeof TOPICS];
@@ -28,6 +38,17 @@ export const CONSUMER_GROUPS = {
   notification: 'notification-service',
   /** Projeção de estado do pedido dentro do Order Service. */
   orderProjection: 'order-projection',
+  /** Painel observável (Fase 7b) — só lê, nunca escreve, nenhum efeito de negócio. */
+  sagaObserver: 'saga-observer',
+  /**
+   * Harness de comparação orquestrada (Fase 11, ADR-0012). Os 4 grupos abaixo vivem
+   * dentro do MESMO processo (`apps/saga-orchestrator-service`), mas em consumer
+   * groups Kafka distintos porque consomem tópicos distintos.
+   */
+  orchestrator: 'saga-orchestrator',
+  paymentExecutor: 'payment-executor',
+  inventoryExecutor: 'inventory-executor',
+  shippingExecutor: 'shipping-executor',
 } as const;
 
 export type ConsumerGroup = (typeof CONSUMER_GROUPS)[keyof typeof CONSUMER_GROUPS];
@@ -109,6 +130,14 @@ export const SUBSCRIPTIONS: Readonly<Record<ConsumerGroup, readonly BusinessTopi
     TOPICS.shipping,
   ],
   [CONSUMER_GROUPS.orderProjection]: [TOPICS.payments, TOPICS.inventory, TOPICS.shipping],
+  [CONSUMER_GROUPS.sagaObserver]: [TOPICS.orders, TOPICS.payments, TOPICS.inventory, TOPICS.shipping],
+  // Harness de comparação orquestrada (Fase 11): o orquestrador só assina as
+  // respostas dos executores; cada executor só assina o próprio comando. Nenhuma
+  // dessas 4 linhas toca em `TOPICS.orders/payments/inventory/shipping`.
+  [CONSUMER_GROUPS.orchestrator]: [TOPICS.responsesOrchestrator],
+  [CONSUMER_GROUPS.paymentExecutor]: [TOPICS.commandsPayment],
+  [CONSUMER_GROUPS.inventoryExecutor]: [TOPICS.commandsInventory],
+  [CONSUMER_GROUPS.shippingExecutor]: [TOPICS.commandsShipping],
 };
 
 /** Toda a topologia derivada: negócio + retry + DLT. Usado pelo script de criação de tópicos. */

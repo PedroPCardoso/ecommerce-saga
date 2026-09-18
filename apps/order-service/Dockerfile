@@ -19,6 +19,7 @@ FROM deps AS build
 COPY . .
 RUN pnpm install --frozen-lockfile --offline
 RUN pnpm --filter @ecommerce/contracts build \
+ && pnpm --filter @ecommerce/observability build \
  && pnpm --filter @ecommerce/kafka build \
  && pnpm --filter @ecommerce/outbox build \
  && pnpm --filter @ecommerce/idempotency build

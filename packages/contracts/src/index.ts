@@ -14,3 +14,4 @@ export * as orderEvents from './events/order.js';
 export * as paymentEvents from './events/payment.js';
 export * as inventoryEvents from './events/inventory.js';
 export * as shippingEvents from './events/shipping.js';
+export * as orchestrationEvents from './events/orchestration.js';

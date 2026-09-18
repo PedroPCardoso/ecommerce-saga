@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ORDER_STATUS } from '@ecommerce/contracts';
-import { applyEvent } from '../src/application/order-state-machine.js';
+import { CANCELLATION_REASON, COMPENSATION_TYPE, ORDER_STATUS, type CompensationType } from '@ecommerce/contracts';
+import { applyCompensationEvent, applyEvent } from '../src/application/order-state-machine.js';
 
 describe('OrderStateMachine.applyEvent', () => {
   it('caminho feliz completo: PENDING -> PAYMENT_APPROVED -> STOCK_RESERVED -> CONFIRMED', () => {
@@ -74,6 +74,102 @@ describe('OrderStateMachine.applyEvent', () => {
     expect(result).toEqual({
       changed: false,
       next: ORDER_STATUS.COMPENSATING,
+      reason: 'stale',
+    });
+  });
+});
+
+describe('applyCompensationEvent', () => {
+  it('stock.unavailable + payment.refunded fecha em CANCELLED (só uma compensação exigida)', () => {
+    const order = {
+      status: ORDER_STATUS.COMPENSATING,
+      compensationReason: CANCELLATION_REASON.STOCK_UNAVAILABLE,
+      compensationsReceived: [] as CompensationType[],
+    };
+
+    const result = applyCompensationEvent(order, 'payment.refunded');
+
+    expect(result).toEqual({
+      changed: true,
+      next: ORDER_STATUS.CANCELLED,
+      compensationsReceived: [COMPENSATION_TYPE.PAYMENT_REFUNDED],
+    });
+  });
+
+  it('shipment.failed + só payment.refunded NÃO fecha ainda — falta stock.released', () => {
+    const order = {
+      status: ORDER_STATUS.COMPENSATING,
+      compensationReason: CANCELLATION_REASON.SHIPMENT_FAILED,
+      compensationsReceived: [] as CompensationType[],
+    };
+
+    const result = applyCompensationEvent(order, 'payment.refunded');
+
+    expect(result).toEqual({
+      changed: true,
+      next: ORDER_STATUS.COMPENSATING,
+      compensationsReceived: [COMPENSATION_TYPE.PAYMENT_REFUNDED],
+    });
+  });
+
+  it('shipment.failed + payment.refunded já recebido + stock.released chegando agora fecha em CANCELLED', () => {
+    const order = {
+      status: ORDER_STATUS.COMPENSATING,
+      compensationReason: CANCELLATION_REASON.SHIPMENT_FAILED,
+      compensationsReceived: [COMPENSATION_TYPE.PAYMENT_REFUNDED] as CompensationType[],
+    };
+
+    const result = applyCompensationEvent(order, 'stock.released');
+
+    expect(result).toEqual({
+      changed: true,
+      next: ORDER_STATUS.CANCELLED,
+      compensationsReceived: [COMPENSATION_TYPE.PAYMENT_REFUNDED, COMPENSATION_TYPE.STOCK_RELEASED],
+    });
+  });
+
+  it('compensação repetida (mesmo tipo já recebido) é stale — ignora sem regredir', () => {
+    const order = {
+      status: ORDER_STATUS.COMPENSATING,
+      compensationReason: CANCELLATION_REASON.SHIPMENT_FAILED,
+      compensationsReceived: [COMPENSATION_TYPE.PAYMENT_REFUNDED] as CompensationType[],
+    };
+
+    const result = applyCompensationEvent(order, 'payment.refunded');
+
+    expect(result).toEqual({ changed: false, reason: 'stale' });
+  });
+
+  it('payment.refunded chegando ANTES de o pedido entrar em COMPENSATING é premature — retriável', () => {
+    const order = {
+      status: ORDER_STATUS.PAYMENT_APPROVED,
+      compensationReason: null,
+      compensationsReceived: [] as CompensationType[],
+    };
+
+    const result = applyCompensationEvent(order, 'payment.refunded');
+
+    expect(result).toEqual({ changed: false, reason: 'premature' });
+  });
+
+  it('compensação chegando depois de o pedido já ter fechado (CONFIRMED/CANCELLED) é stale', () => {
+    const confirmed = {
+      status: ORDER_STATUS.CONFIRMED,
+      compensationReason: null,
+      compensationsReceived: [] as CompensationType[],
+    };
+    expect(applyCompensationEvent(confirmed, 'payment.refunded')).toEqual({
+      changed: false,
+      reason: 'stale',
+    });
+
+    const cancelled = {
+      status: ORDER_STATUS.CANCELLED,
+      compensationReason: CANCELLATION_REASON.STOCK_UNAVAILABLE,
+      compensationsReceived: [COMPENSATION_TYPE.PAYMENT_REFUNDED] as CompensationType[],
+    };
+    expect(applyCompensationEvent(cancelled, 'payment.refunded')).toEqual({
+      changed: false,
       reason: 'stale',
     });
   });

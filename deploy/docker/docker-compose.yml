@@ -144,6 +144,19 @@ services:
       POSTGRES_DB: notification_db
     volumes: [pg-notification:/var/lib/postgresql/data]
 
+  # Banco do harness de comparação orquestrada (Fase 11, ADR-0012) — isolado dos 5
+  # acima pela mesma razão do comentário no topo do arquivo: nenhum serviço de
+  # produção pode ler o estado deste harness, nem vice-versa.
+  postgres-orchestrator:
+    <<: *postgres-common
+    container_name: ecommerce-pg-orchestrator
+    ports: ['15437:5432']
+    environment:
+      POSTGRES_USER: orchestrator_svc
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: orchestrator_db
+    volumes: [pg-orchestrator:/var/lib/postgresql/data]
+
   # --------------------------------------------------------- observabilidade ---
   jaeger:
     image: jaegertracing/all-in-one:1.64.0
@@ -168,6 +181,7 @@ services:
       - '--storage.tsdb.retention.time=6h'
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
     networks: [saga]
 
   grafana:
@@ -224,6 +238,7 @@ services:
       KAFKA_CLIENT_ID_PREFIX: ecommerce
       JWT_SECRET: dev-only-not-a-real-secret-change-me
       JWT_ISSUER: ecommerce-local
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     depends_on:
       kafka:
         condition: service_healthy
@@ -244,6 +259,7 @@ services:
       PAYMENT_DATABASE_URL: postgresql://payment_svc:changeme@postgres-payment:5432/payment_db?schema=public
       KAFKA_BROKERS: kafka:9092
       KAFKA_CLIENT_ID_PREFIX: ecommerce
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     depends_on:
       kafka:
         condition: service_healthy
@@ -264,6 +280,7 @@ services:
       INVENTORY_DATABASE_URL: postgresql://inventory_svc:changeme@postgres-inventory:5432/inventory_db?schema=public
       KAFKA_BROKERS: kafka:9092
       KAFKA_CLIENT_ID_PREFIX: ecommerce
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     depends_on:
       kafka:
         condition: service_healthy
@@ -284,6 +301,7 @@ services:
       SHIPPING_DATABASE_URL: postgresql://shipping_svc:changeme@postgres-shipping:5432/shipping_db?schema=public
       KAFKA_BROKERS: kafka:9092
       KAFKA_CLIENT_ID_PREFIX: ecommerce
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     depends_on:
       kafka:
         condition: service_healthy
@@ -307,6 +325,7 @@ services:
       SMTP_HOST: mailhog
       SMTP_PORT: '1025'
       SMTP_FROM: no-reply@example.com
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     depends_on:
       kafka:
         condition: service_healthy
@@ -314,6 +333,51 @@ services:
         condition: service_healthy
       mailhog:
         condition: service_started
+    networks: [saga]
+
+  # Painel observável (Fase 7b): SEM banco, SEM auth — ver
+  # docs/superpowers/plans/2026-09-18-fase7b-saga-observer.md (Global
+  # Constraints) para o porquê do escopo reduzido.
+  saga-observer:
+    build:
+      context: ../..
+      dockerfile: apps/saga-observer/Dockerfile
+    container_name: ecommerce-saga-observer
+    restart: unless-stopped
+    ports: ['3005:3005']
+    environment:
+      NODE_ENV: production
+      SAGA_OBSERVER_PORT: '3005'
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID_PREFIX: ecommerce
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks: [saga]
+
+  # Harness de comparação orquestração vs. coreografia (Fase 11, ADR-0012): app
+  # NOVO e ISOLADO, ao lado da coreografia real — não a substitui e não é
+  # consumido por nenhum dos 5 serviços de produção. Ver Global Constraints do
+  # plano desta fase.
+  saga-orchestrator-service:
+    build:
+      context: ../..
+      dockerfile: apps/saga-orchestrator-service/Dockerfile
+    container_name: ecommerce-saga-orchestrator-service
+    restart: unless-stopped
+    ports: ['3006:3006']
+    environment:
+      NODE_ENV: production
+      SAGA_ORCHESTRATOR_SERVICE_PORT: '3006'
+      ORCHESTRATOR_DATABASE_URL: postgresql://orchestrator_svc:changeme@postgres-orchestrator:5432/orchestrator_db?schema=public
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID_PREFIX: ecommerce
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres-orchestrator:
+        condition: service_healthy
     networks: [saga]
 
 networks:
@@ -327,4 +391,5 @@ volumes:
   pg-inventory:
   pg-shipping:
   pg-notification:
+  pg-orchestrator:
   grafana-data:

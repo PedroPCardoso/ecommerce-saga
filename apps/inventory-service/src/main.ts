@@ -1,9 +1,11 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { initTracing } from '@ecommerce/observability';
 import { AppModule } from './app.module.js';
 import { env } from './env.js';
 
 async function bootstrap(): Promise<void> {
+  initTracing('inventory-service');
   const app = await NestFactory.create(AppModule);
   await app.listen(env.INVENTORY_SERVICE_PORT);
   console.log(`[inventory-service] ouvindo na porta ${env.INVENTORY_SERVICE_PORT}`);

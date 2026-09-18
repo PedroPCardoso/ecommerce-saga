@@ -1,0 +1,29 @@
+groups:
+  - name: saga
+    rules:
+      - alert: KafkaConsumerLagAlto
+        expr: kafka_consumer_lag > 1000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Lag do consumidor {{ $labels.group }} em {{ $labels.topic }} acima de 1000'
+
+      - alert: MensagensNaDLT
+        expr: increase(dlq_messages_total[5m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Mensagem nova na DLT: {{ $labels.topic }} / {{ $labels.consumerGroup }}'
+
+      - alert: TaxaDeCompensacaoAlta
+        expr: |
+          sum(rate(saga_compensations_total[15m]))
+          /
+          sum(rate(saga_duration_seconds_count[15m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Mais de 5% das sagas concluídas nos últimos 15min precisaram de compensação'

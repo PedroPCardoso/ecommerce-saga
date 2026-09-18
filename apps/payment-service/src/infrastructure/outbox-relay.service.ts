@@ -24,6 +24,7 @@ export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
       }
       await this.producer.publish(definition.topic, envelope, row.headers);
     },
+    serviceName: 'payment-service',
   });
 
   async onModuleInit(): Promise<void> {

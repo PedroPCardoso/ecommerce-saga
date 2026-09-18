@@ -94,3 +94,16 @@ export const CANCELLATION_REASON = {
 
 export const cancellationReasonSchema = z.nativeEnum(CANCELLATION_REASON);
 export type CancellationReason = z.infer<typeof cancellationReasonSchema>;
+
+/**
+ * O que a saga já desfez ao fechar um pedido em CANCELLED. Nomeado (não enum
+ * inline) porque `order-state-machine.ts` do Order Service precisa comparar
+ * contra ele para decidir se uma compensação pendente já está completa.
+ */
+export const COMPENSATION_TYPE = {
+  PAYMENT_REFUNDED: 'PAYMENT_REFUNDED',
+  STOCK_RELEASED: 'STOCK_RELEASED',
+} as const;
+
+export const compensationTypeSchema = z.nativeEnum(COMPENSATION_TYPE);
+export type CompensationType = z.infer<typeof compensationTypeSchema>;

@@ -23,6 +23,7 @@ RUN pnpm install --frozen-lockfile --offline
 # dos outros 4 serviços, aqui só compilamos o que o package.json realmente
 # declara como dependência (contracts, kafka, idempotency).
 RUN pnpm --filter @ecommerce/contracts build \
+ && pnpm --filter @ecommerce/observability build \
  && pnpm --filter @ecommerce/kafka build \
  && pnpm --filter @ecommerce/idempotency build
 RUN pnpm --filter @ecommerce/notification-service prisma:generate

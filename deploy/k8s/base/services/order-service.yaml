@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: order-service, namespace: ecommerce-saga }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: order-service-config, namespace: ecommerce-saga }
+data:
+  NODE_ENV: production
+  ORDER_SERVICE_PORT: '3000'
+  KAFKA_BROKERS: saga-kafka-kafka-bootstrap:9092
+  KAFKA_CLIENT_ID_PREFIX: ecommerce
+  JWT_ISSUER: ecommerce-local
+  SAGA_TIMEOUT_THRESHOLD_MS: '300000'
+  SAGA_TIMEOUT_SWEEP_INTERVAL_MS: '30000'
+---
+apiVersion: v1
+kind: Secret
+metadata: { name: order-service-secrets, namespace: ecommerce-saga }
+type: Opaque
+stringData:
+  # Valores FICTÍCIOS, iguais ao .env.example — troque antes de qualquer uso real.
+  ORDER_DATABASE_URL: postgresql://order_svc:changeme@saga-postgres-rw:5432/order_db?schema=public
+  JWT_SECRET: dev-only-not-a-real-secret-change-me
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: order-service, namespace: ecommerce-saga }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: order-service } }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata: { labels: { app: order-service } }
+    spec:
+      serviceAccountName: order-service
+      terminationGracePeriodSeconds: 45
+      containers:
+        - name: order-service
+          image: ecommerce-saga-order-service:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 3000 }]
+          envFrom:
+            - configMapRef: { name: order-service-config }
+            - secretRef: { name: order-service-secrets }
+          lifecycle:
+            preStop:
+              exec: { command: ['sh', '-c', 'sleep 5'] }
+          startupProbe:
+            httpGet: { path: /health/startup, port: 3000 }
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet: { path: /health/ready, port: 3000 }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health/live, port: 3000 }
+            periodSeconds: 10
+          resources:
+            requests: { memory: 128Mi, cpu: '100m' }
+            limits: { memory: 256Mi, cpu: '250m' }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: order-service, namespace: ecommerce-saga }
+spec:
+  selector: { app: order-service }
+  ports: [{ port: 3000, targetPort: 3000 }]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: order-service, namespace: ecommerce-saga }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: order-service } }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: order-service, namespace: ecommerce-saga }
+spec:
+  podSelector: { matchLabels: { app: order-service } }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: [] # Ingress controller entra por fora do namespace — refine com um label de namespace do ingress-nginx se quiser trancar mais
+      ports: [{ port: 3000 }]
+  egress:
+    - to: [] # Kafka e Postgres já são outros pods do MESMO namespace — sem seletor, permite tudo dentro; troque por matchLabels do saga-kafka/saga-postgres para trancar mais

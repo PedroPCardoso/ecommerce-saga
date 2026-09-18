@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: shipping-service, namespace: ecommerce-saga }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: shipping-service-config, namespace: ecommerce-saga }
+data:
+  NODE_ENV: production
+  SHIPPING_SERVICE_PORT: '3003'
+  KAFKA_BROKERS: saga-kafka-kafka-bootstrap:9092
+  KAFKA_CLIENT_ID_PREFIX: ecommerce
+---
+apiVersion: v1
+kind: Secret
+metadata: { name: shipping-service-secrets, namespace: ecommerce-saga }
+type: Opaque
+stringData:
+  # Valores FICTÍCIOS, iguais ao .env.example — troque antes de qualquer uso real.
+  SHIPPING_DATABASE_URL: postgresql://shipping_svc:changeme@saga-postgres-rw:5432/shipping_db?schema=public
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: shipping-service, namespace: ecommerce-saga }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: shipping-service } }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata: { labels: { app: shipping-service } }
+    spec:
+      serviceAccountName: shipping-service
+      terminationGracePeriodSeconds: 45
+      containers:
+        - name: shipping-service
+          image: ecommerce-saga-shipping-service:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 3003 }]
+          envFrom:
+            - configMapRef: { name: shipping-service-config }
+            - secretRef: { name: shipping-service-secrets }
+          lifecycle:
+            preStop:
+              exec: { command: ['sh', '-c', 'sleep 5'] }
+          startupProbe:
+            httpGet: { path: /health/startup, port: 3003 }
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet: { path: /health/ready, port: 3003 }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health/live, port: 3003 }
+            periodSeconds: 10
+          resources:
+            requests: { memory: 128Mi, cpu: '100m' }
+            limits: { memory: 256Mi, cpu: '250m' }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: shipping-service, namespace: ecommerce-saga }
+spec:
+  selector: { app: shipping-service }
+  ports: [{ port: 3003, targetPort: 3003 }]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: shipping-service, namespace: ecommerce-saga }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: shipping-service } }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: shipping-service, namespace: ecommerce-saga }
+spec:
+  podSelector: { matchLabels: { app: shipping-service } }
+  policyTypes: [Ingress, Egress]
+  ingress: [] # não recebe tráfego externo — só o Kafka aciona (e o pod é quem PUXA do Kafka, não o inverso)
+  egress:
+    - to: [] # Kafka e Postgres são outros pods do MESMO namespace — sem seletor, permite tudo dentro; troque por matchLabels do saga-kafka/saga-postgres para trancar mais

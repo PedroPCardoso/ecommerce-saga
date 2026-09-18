@@ -30,7 +30,7 @@ jobs:
         run: cp .env.example .env
       - name: Gera o Prisma Client de cada serviço
         run: |
-          for svc in order payment inventory shipping notification; do
+          for svc in order payment inventory shipping notification saga-orchestrator; do
             pnpm --filter "@ecommerce/${svc}-service" run prisma:generate
           done
 
@@ -61,11 +61,11 @@ jobs:
       - name: Sobe infra (Kafka + Postgres + Mailhog)
         run: |
           docker compose -f deploy/docker/docker-compose.yml up -d \
-            kafka postgres-order postgres-payment postgres-inventory postgres-shipping postgres-notification mailhog
+            kafka postgres-order postgres-payment postgres-inventory postgres-shipping postgres-notification postgres-orchestrator mailhog
 
       - name: Espera Kafka e Postgres ficarem saudáveis
         run: |
-          containers="ecommerce-kafka ecommerce-pg-order ecommerce-pg-payment ecommerce-pg-inventory ecommerce-pg-shipping ecommerce-pg-notification"
+          containers="ecommerce-kafka ecommerce-pg-order ecommerce-pg-payment ecommerce-pg-inventory ecommerce-pg-shipping ecommerce-pg-notification ecommerce-pg-orchestrator"
           for i in $(seq 1 60); do
             all_healthy=true
             for c in $containers; do
@@ -98,7 +98,7 @@ jobs:
 
       - name: Gera o Prisma Client e aplica migrations de cada serviço
         run: |
-          for svc in order payment inventory shipping notification; do
+          for svc in order payment inventory shipping notification saga-orchestrator; do
             pnpm --filter "@ecommerce/${svc}-service" run prisma:generate
             pnpm --filter "@ecommerce/${svc}-service" run prisma:deploy
           done
@@ -121,7 +121,8 @@ jobs:
     needs: lint-typecheck-build
     steps:
       - uses: actions/checkout@v4
-      - name: Builda as 5 imagens de serviço
+      - name: Builda as imagens de serviço
         run: |
           docker compose -f deploy/docker/docker-compose.yml build \
-            order-service payment-service inventory-service shipping-service notification-service
+            order-service payment-service inventory-service shipping-service notification-service \
+            saga-observer saga-orchestrator-service

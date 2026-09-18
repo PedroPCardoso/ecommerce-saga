@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Saga Observer</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #0f172a; color: #e2e8f0; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 0.5rem 1rem; text-align: left; border-bottom: 1px solid #334155; }
+    .status-CONFIRMED { color: #4ade80; }
+    .status-CANCELLED { color: #f87171; }
+    .status-COMPENSATING { color: #facc15; }
+    .status-PENDING, .status-PAYMENT_APPROVED, .status-STOCK_RESERVED { color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <h1>Saga Observer</h1>
+  <p id="connection-status">conectando…</p>
+  <table>
+    <thead><tr><th>Order ID</th><th>Status</th><th>Último evento</th><th>Quando</th></tr></thead>
+    <tbody id="orders"></tbody>
+  </table>
+
+  <script>
+    const rows = new Map();
+    const tbody = document.getElementById('orders');
+
+    function render(snapshot) {
+      let row = rows.get(snapshot.orderId);
+      if (!row) {
+        row = document.createElement('tr');
+        row.innerHTML = '<td class="order-id"></td><td class="status"></td><td class="event"></td><td class="when"></td>';
+        tbody.appendChild(row);
+        rows.set(snapshot.orderId, row);
+      }
+      row.querySelector('.order-id').textContent = snapshot.orderId;
+      row.querySelector('.status').textContent = snapshot.status;
+      row.querySelector('.status').className = 'status status-' + snapshot.status;
+      row.querySelector('.event').textContent = snapshot.eventType;
+      row.querySelector('.when').textContent = new Date(snapshot.occurredAt).toLocaleTimeString('pt-BR');
+    }
+
+    fetch('/api/orders').then((r) => r.json()).then((snapshots) => snapshots.forEach(render));
+
+    const source = new EventSource('/api/orders/stream');
+    source.onopen = () => { document.getElementById('connection-status').textContent = 'conectado'; };
+    source.onerror = () => { document.getElementById('connection-status').textContent = 'reconectando…'; };
+    source.onmessage = (event) => render(JSON.parse(event.data));
+  </script>
+</body>
+</html>

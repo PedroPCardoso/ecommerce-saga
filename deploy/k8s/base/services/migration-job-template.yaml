@@ -1,0 +1,108 @@
+# Um Job de migration por serviço, rodando `prisma migrate deploy` ANTES do
+# Deployment escalar (nunca num initContainer — 2 réplicas rodariam a
+# migration em paralelo). A anotação `helm.sh/hook` só faz sentido de verdade
+# com Helm (Task 10b, fora de escopo desta rodada) — sem Helm, aplique cada
+# Job MANUALMENTE antes do respectivo Deployment:
+#
+#   kubectl apply -f order-service-migrate.yaml
+#   kubectl wait job/order-service-migrate --for=condition=Complete --timeout=120s -n ecommerce-saga
+#   kubectl apply -f order-service.yaml
+#
+# (repita para payment/inventory/shipping/notification, trocando o nome e a
+# imagem/filter do pnpm). Os 5 Jobs abaixo seguem o mesmo template — cada um
+# usa a imagem/ConfigMap/Secret do respectivo serviço.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: order-service-migrate
+  namespace: ecommerce-saga
+  annotations: { "helm.sh/hook": pre-upgrade }
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ecommerce-saga-order-service:latest
+          command: ['pnpm', '--filter', '@ecommerce/order-service', 'exec', 'prisma', 'migrate', 'deploy']
+          envFrom:
+            - configMapRef: { name: order-service-config }
+            - secretRef: { name: order-service-secrets }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: payment-service-migrate
+  namespace: ecommerce-saga
+  annotations: { "helm.sh/hook": pre-upgrade }
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ecommerce-saga-payment-service:latest
+          command: ['pnpm', '--filter', '@ecommerce/payment-service', 'exec', 'prisma', 'migrate', 'deploy']
+          envFrom:
+            - configMapRef: { name: payment-service-config }
+            - secretRef: { name: payment-service-secrets }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: inventory-service-migrate
+  namespace: ecommerce-saga
+  annotations: { "helm.sh/hook": pre-upgrade }
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ecommerce-saga-inventory-service:latest
+          command: ['pnpm', '--filter', '@ecommerce/inventory-service', 'exec', 'prisma', 'migrate', 'deploy']
+          envFrom:
+            - configMapRef: { name: inventory-service-config }
+            - secretRef: { name: inventory-service-secrets }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: shipping-service-migrate
+  namespace: ecommerce-saga
+  annotations: { "helm.sh/hook": pre-upgrade }
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ecommerce-saga-shipping-service:latest
+          command: ['pnpm', '--filter', '@ecommerce/shipping-service', 'exec', 'prisma', 'migrate', 'deploy']
+          envFrom:
+            - configMapRef: { name: shipping-service-config }
+            - secretRef: { name: shipping-service-secrets }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: notification-service-migrate
+  namespace: ecommerce-saga
+  annotations: { "helm.sh/hook": pre-upgrade }
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ecommerce-saga-notification-service:latest
+          command: ['pnpm', '--filter', '@ecommerce/notification-service', 'exec', 'prisma', 'migrate', 'deploy']
+          envFrom:
+            - configMapRef: { name: notification-service-config }
+            - secretRef: { name: notification-service-secrets }
