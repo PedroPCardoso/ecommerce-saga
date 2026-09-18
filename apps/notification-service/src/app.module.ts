@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ObservabilityModule } from '@ecommerce/observability';
 import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
 import { MailerService } from './infrastructure/mailer.service.js';
@@ -6,6 +7,7 @@ import { NotificationConsumerService } from './infrastructure/notification-consu
 import { NotificationEventHandler } from './application/notification-event.handler.js';
 
 @Module({
+  imports: [ObservabilityModule],
   controllers: [HealthController],
   providers: [PrismaService, MailerService, NotificationEventHandler, NotificationConsumerService],
 })
