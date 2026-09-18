@@ -9,7 +9,7 @@ describe('maskPii', () => {
 
   it('mascara qualquer campo cujo NOME contenha token/secret/password/authorization', () => {
     const result = maskPii({
-      gatewayToken: 'tok_live_abc123',
+      gatewayToken: 'tok_test_abc123',
       apiSecret: 'shh',
       password: 'hunter2',
       Authorization: 'Bearer xyz',
@@ -24,14 +24,27 @@ describe('maskPii', () => {
     });
   });
 
-  it('mascara recursivamente objetos aninhados e arrays', () => {
+  it('mascara shippingAddress, customerId e items POR INTEIRO — não campo a campo', () => {
     const result = maskPii({
-      payload: { instrument: { gatewayToken: 'tok_1', cardLast4: '4242' } },
-      items: [{ sku: 'BOOK-001', customerEmail: 'a@b.com' }],
+      orderId: 'abc-123',
+      customerId: 'cust-456',
+      shippingAddress: { street: 'Rua A', number: '100', city: 'São Paulo', zipCode: '01000-000' },
+      items: [{ sku: 'BOOK-001', unitPriceCents: 2000 }],
+    });
+    expect(result).toEqual({
+      orderId: 'abc-123',
+      customerId: '***MASKED***',
+      shippingAddress: '***MASKED***',
+      items: '***MASKED***',
+    });
+  });
+
+  it('mascara recursivamente objetos aninhados', () => {
+    const result = maskPii({
+      payload: { instrument: { gatewayToken: 'tok_test_1', cardLast4: '4242' } },
     });
     expect(result).toEqual({
       payload: { instrument: { gatewayToken: '***MASKED***', cardLast4: '4242' } },
-      items: [{ sku: 'BOOK-001', customerEmail: '***@***' }],
     });
   });
 

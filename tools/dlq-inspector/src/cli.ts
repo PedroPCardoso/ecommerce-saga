@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Kafka, logLevel } from 'kafkajs';
-import { RETRY_HEADERS } from '@ecommerce/contracts';
+import { ALL_BUSINESS_TOPICS, RETRY_HEADERS } from '@ecommerce/contracts';
 import { EventProducer } from '@ecommerce/kafka';
 import { maskPii } from './mask.js';
 
@@ -53,7 +53,11 @@ async function list(topic: string): Promise<void> {
     return;
   }
   for (const msg of messages) {
-    const error = msg.headers[RETRY_HEADERS.lastError] ?? '(sem erro registrado)';
+    // x-last-error carrega até 500 caracteres de mensagem de erro ARBITRÁRIA
+    // (packages/kafka/src/retry-headers.ts) — não confiável o bastante para imprimir
+    // crua; passa pelo mesmo maskPii do `show`, não só o payload.
+    const maskedHeaders = maskPii(msg.headers) as Record<string, string>;
+    const error = maskedHeaders[RETRY_HEADERS.lastError] ?? '(sem erro registrado)';
     console.log(`offset=${msg.offset} key=${msg.key} erro="${error}"`);
   }
 }
@@ -67,10 +71,15 @@ async function show(topic: string, offset: string): Promise<void> {
     return;
   }
   const parsed = found.value ? JSON.parse(found.value) : null;
-  console.log(JSON.stringify({ headers: found.headers, payload: maskPii(parsed) }, null, 2));
+  // headers também passam por maskPii — x-last-error pode carregar até 500
+  // caracteres de erro arbitrário (potencialmente com dado de payload embutido).
+  console.log(JSON.stringify({ headers: maskPii(found.headers), payload: maskPii(parsed) }, null, 2));
 }
 
-async function replay(topic: string, offset: string): Promise<void> {
+/** Tópicos para onde um replay pode legitimamente mandar uma mensagem de volta. */
+const REPLAY_ALLOWED_TOPICS = new Set<string>(ALL_BUSINESS_TOPICS);
+
+async function replay(topic: string, offset: string, force: boolean): Promise<void> {
   const messages = await readTopic(topic, 1000);
   const found = messages.find((m) => m.offset === offset);
   if (!found) {
@@ -84,6 +93,25 @@ async function replay(topic: string, offset: string): Promise<void> {
     process.exitCode = 1;
     return;
   }
+  // O destino vem de um header ESCRITO POR QUEM PRODUZIU A MENSAGEM NA DLT — entrada
+  // não confiável, como qualquer payload vindo do broker (A05/A01). Sem allowlist, um
+  // operador rodando replay numa DLT poderia ser levado a publicar em qualquer tópico
+  // arbitrário, inclusive um de retry/DLT (reprocessamento em cascata) ou um tópico
+  // novo criado silenciosamente (o broker do compose tem auto-create habilitado).
+  if (!REPLAY_ALLOWED_TOPICS.has(originalTopic)) {
+    console.error(
+      `Destino "${originalTopic}" (do header ${RETRY_HEADERS.originalTopic}) não é um tópico de negócio conhecido — recusando replay. Tópicos permitidos: ${[...REPLAY_ALLOWED_TOPICS].join(', ')}`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+  if (!force) {
+    console.error(
+      `Replay reenvia offset=${offset} de ${topic} para ${originalTopic} de forma IRREVERSÍVEL. Rode de novo com --force para confirmar.`,
+    );
+    process.exitCode = 1;
+    return;
+  }
 
   const producer = new EventProducer({ brokers: KAFKA_BROKERS, clientId: 'dlq-inspector-replay' });
   await producer.connect();
@@ -92,26 +120,36 @@ async function replay(topic: string, offset: string): Promise<void> {
   console.log(`Reenviado offset=${offset} de ${topic} para ${originalTopic}.`);
 }
 
+function usage(message: string): void {
+  console.error(message);
+  console.error('Comandos: list <topico> | show <topico> <offset> | replay <topico> <offset> [--force]');
+  process.exitCode = 1;
+}
+
 async function main(): Promise<void> {
-  const [command, topic, offset] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const force = args.includes('--force');
+  const [command, topic, offset] = args.filter((arg) => arg !== '--force');
 
   switch (command) {
     case 'list':
-      if (!topic) throw new Error('uso: dlq-inspector list <topico>');
+      if (!topic) return usage('uso: dlq-inspector list <topico>');
       await list(topic);
       return;
     case 'show':
-      if (!topic || !offset) throw new Error('uso: dlq-inspector show <topico> <offset>');
+      if (!topic || !offset) return usage('uso: dlq-inspector show <topico> <offset>');
       await show(topic, offset);
       return;
     case 'replay':
-      if (!topic || !offset) throw new Error('uso: dlq-inspector replay <topico> <offset>');
-      await replay(topic, offset);
+      if (!topic || !offset) return usage('uso: dlq-inspector replay <topico> <offset> [--force]');
+      await replay(topic, offset, force);
       return;
     default:
-      console.error('Comandos: list <topico> | show <topico> <offset> | replay <topico> <offset>');
-      process.exitCode = 1;
+      usage('Comando desconhecido.');
   }
 }
 
-void main();
+main().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
+});
