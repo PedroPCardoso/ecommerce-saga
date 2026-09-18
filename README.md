@@ -1,7 +1,9 @@
 # SAGA coreografada sobre Kafka — repositório de estudos
 
 Cinco microserviços NestJS coordenando um pedido de e-commerce **sem orquestrador
-central**, com Docker e Kubernetes, documentado em C4.
+central**, com Docker e Kubernetes, documentado em C4 — mais um painel de observação
+ao vivo da saga (`saga-observer`) e um harness isolado que implementa a MESMA saga via
+orquestração, só para comparar (`saga-orchestrator-service`, [ADR-0012](docs/adr/0012-comparacao-orquestracao-vs-coreografia.md)).
 
 O objetivo não é ter o código pronto: é entender por que cada peça existe, o que ela
 custa, e como cada uma falha quando você erra. Por isso o repositório tem três coisas que
@@ -26,17 +28,17 @@ POST /orders
     └─► order.created ──► Payment autoriza
                               ├── payment.failed ─────────────────────────► CANCELLED
                               └── payment.approved ──► Inventory reserva
-                                                          ├── stock.unavailable ──► Payment ESTORNA* ──► CANCELLED
+                                                          ├── stock.unavailable ──► Payment ESTORNA ──► CANCELLED
                                                           └── stock.reserved ──► Shipping etiqueta
-                                                                                     ├── shipment.failed ──► Payment ESTORNA*
-                                                                                     │                    └► Inventory LIBERA* ──► CANCELLED
+                                                                                     ├── shipment.failed ──► Payment ESTORNA
+                                                                                     │                    └► Inventory LIBERA ──► CANCELLED
                                                                                      └── shipment.created ──► CONFIRMED
 ```
 
 Ninguém comanda. Cada serviço reage a eventos e publica o que aconteceu no seu domínio.
-
-\* **Estorno/liberação (compensação) ainda não estão implementados** — ver "Estado
-atual" mais abaixo. Hoje esses dois ramos param em `COMPENSATING`, não em `CANCELLED`.
+Além do sweeper de timeout (Order Service) publicando `saga.timeout` para pedidos presos
+em `PAYMENT_APPROVED` sem resposta do Inventory — mais um gatilho de estorno, mesmo
+caminho de `CANCELLED`.
 
 ## O ponto do exercício
 
@@ -123,14 +125,15 @@ docs/PLAN.md           plano de execução completo, 13 fases
 
 examples/              6 exemplos executáveis contra Kafka e Postgres reais
 
-packages/contracts/    fonte ÚNICA dos contratos de evento e da topologia Kafka
-packages/kafka/        consumo com commit manual, retry escalonado, DLT      (Fase 2)
-packages/outbox/       Transactional Outbox + relay                          (Fase 2)
-packages/idempotency/  tabela de inbox + markProcessed() dentro da transação  (Fase 2)
-apps/                  os 5 serviços de negócio (Fases 1 a 5) + saga-observer (Fase 7b)
-deploy/docker/         infra local
-deploy/k8s|helm/       Kubernetes                                          (Fase 10)
-tools/dlq-inspector/   CLI para inspecionar e reprocessar a DLT              (Fase 6)
+packages/contracts/      fonte ÚNICA dos contratos de evento e da topologia Kafka
+packages/kafka/          consumo com commit manual, retry escalonado, DLT, tracing (Fase 2/7)
+packages/outbox/         Transactional Outbox + relay + métrica de lag             (Fase 2/7)
+packages/idempotency/    tabela de inbox + markProcessed() dentro da transação     (Fase 2)
+packages/observability/  tracing manual (traceparent), métricas Prometheus, logger (Fase 7)
+apps/                    5 serviços de negócio (Fases 1-5) + saga-observer (7b) + saga-orchestrator-service (11, harness de comparação isolado)
+deploy/docker/           infra local
+deploy/k8s/base/         Kubernetes — manifests crus                            (Fase 10)
+tools/dlq-inspector/     CLI para inspecionar e reprocessar a DLT                (Fase 6)
 ```
 
 Serviço **nunca** declara o schema de um evento que consome — importa de
@@ -164,20 +167,23 @@ usar nenhum — o exemplo 03 mostra exatamente por quê.
 - [x] **Fase 9** — Docker de produção (5 imagens multi-stage, non-root, 0 CVE HIGH/CRITICAL, docker-compose integrado)
 - [x] **Fase 6** — resiliência, caos, replay, `dlq-inspector`
 - [x] **Fase 7** — observabilidade (tracing + métricas nos 5 serviços) · **7b** — `apps/saga-observer`: 6º serviço, só-consumidor, projeta a saga em memória e expõe via SSE (`GET /api/orders`, `GET /api/orders/stream`) um front estático (`public/index.html`) que mostra cada evento chegando ao vivo
-- [ ] **Fase 8** — C4 nível 3
+- [x] **Fase 8** — C4 nível 3 (componentes do Order Service, nomeados como as classes reais)
 - [~] **Fase 10** — Kubernetes / Minikube: manifests crus (10a) escritos e commitados, CloudNativePG provado ao vivo, Strimzi Kafka **bloqueado** nesta rodada — ver [seção dedicada](#kubernetes-fase-10) abaixo
-- [ ] **Fase 11** — versão orquestrada, para comparação (opcional)
+- [x] **Fase 11** — versão orquestrada, para comparação — harness isolado (`apps/saga-orchestrator-service`, banco e tópicos próprios, não toca nos 5 serviços de produção) + [ADR-0012](docs/adr/0012-comparacao-orquestracao-vs-coreografia.md) com números medidos (latência, LoC, serviços tocados)
 
-**Limitação conhecida e deliberada:** a matriz de compensação (`payment.refunded`,
-`stock.released` — ver [módulo 08](docs/aprender/08-compensacao.md) e
-`COMPENSATION_MATRIX` em `packages/contracts/src/registry.ts`) ainda não está
-implementada em nenhum serviço. Um pedido que falha em `stock.unavailable` ou
-`shipment.failed` avança para `COMPENSATING` e **fica lá** — de propósito: fechar o
-pedido como `CANCELLED` sem a compensação ter de fato acontecido seria mentir no
-histórico do pedido. `payment.failed` (nada foi efetivado ainda) fecha normalmente em
-`CANCELLED`. Isso significa que hoje não há nada — humano ou automático — vigiando
-pedidos presos em `COMPENSATING`; é o próximo trabalho antes de a Fase 6 (DLQ/replay)
-fazer sentido.
+**Matriz de compensação (I4) — implementada.** `payment.refunded` (Payment Service,
+reagindo a `stock.unavailable`/`shipment.failed`/`saga.timeout`) e `stock.released`
+(Inventory Service, reagindo a `shipment.failed`) fecham o pedido em `CANCELLED` de
+verdade — `stock.unavailable` só precisa do estorno; `shipment.failed` precisa dos
+DOIS (estorno **e** liberação de estoque, em qualquer ordem) antes de fechar. Ver
+[módulo 08](docs/aprender/08-compensacao.md) e `COMPENSATION_MATRIX` em
+`packages/contracts/src/registry.ts`.
+
+**Sweeper de timeout (Fase 6) — implementado.** `SagaTimeoutSweeperService` (Order
+Service) varre pedidos presos em `PAYMENT_APPROVED` além do limite configurado e
+publica `saga.timeout`, que o Payment Service consome como mais um gatilho de estorno.
+`tools/dlq-inspector` lista, inspeciona (com mascaramento de PII) e reprocessa
+mensagens da DLT.
 
 ---
 
