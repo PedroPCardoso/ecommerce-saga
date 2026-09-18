@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-typecheck-build:
+    name: Lint, typecheck, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec turbo run lint typecheck build
+
+  test:
+    name: Test (contra Kafka + Postgres reais)
+    runs-on: ubuntu-latest
+    needs: lint-typecheck-build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # .env com os MESMOS valores fictícios de .env.example (casam com as portas do
+      # compose abaixo) — nunca segredo real (A02/A04). Todo script de serviço já
+      # espera este arquivo via `dotenv -e ../../.env`, igual ao fluxo local.
+      - name: Cria .env a partir do template
+        run: cp .env.example .env
+
+      # Reaproveita o compose local: sobe só a infra (Kafka + 5 Postgres), não os
+      # serviços de aplicação — quem exercita o código é o `turbo run test` local.
+      - name: Sobe infra (Kafka + Postgres)
+        run: |
+          docker compose -f deploy/docker/docker-compose.yml up -d \
+            kafka postgres-order postgres-payment postgres-inventory postgres-shipping postgres-notification
+
+      - name: Espera Kafka e Postgres ficarem saudáveis
+        run: |
+          containers="ecommerce-kafka ecommerce-pg-order ecommerce-pg-payment ecommerce-pg-inventory ecommerce-pg-shipping ecommerce-pg-notification"
+          for i in $(seq 1 60); do
+            all_healthy=true
+            for c in $containers; do
+              status=$(docker inspect --format='{{.State.Health.Status}}' "$c" 2>/dev/null || echo "missing")
+              if [ "$status" != "healthy" ]; then all_healthy=false; fi
+            done
+            if [ "$all_healthy" = "true" ]; then echo "infra saudável"; exit 0; fi
+            sleep 2
+          done
+          echo "timeout esperando infra ficar saudável"
+          docker compose -f deploy/docker/docker-compose.yml ps
+          docker compose -f deploy/docker/docker-compose.yml logs kafka
+          exit 1
+
+      - name: Cria os tópicos Kafka
+        run: pnpm topics:create
+
+      - name: Gera o Prisma Client e aplica migrations de cada serviço
+        run: |
+          for svc in order payment inventory shipping notification; do
+            pnpm --filter "@ecommerce/${svc}-service" run prisma:generate
+            pnpm --filter "@ecommerce/${svc}-service" run prisma:deploy
+          done
+
+      - name: Roda a suíte de testes completa
+        run: pnpm exec turbo run test
+
+      - name: Logs da infra (se falhar)
+        if: failure()
+        run: docker compose -f deploy/docker/docker-compose.yml logs --tail 200
+
+  docker-build:
+    name: Build das imagens Docker
+    runs-on: ubuntu-latest
+    needs: lint-typecheck-build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Builda as 5 imagens de serviço
+        run: |
+          docker compose -f deploy/docker/docker-compose.yml build \
+            order-service payment-service inventory-service shipping-service notification-service
