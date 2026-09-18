@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-additional-databases
+  namespace: ecommerce-saga
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: init-db
+          image: postgres:17-alpine
+          env:
+            - name: PGHOST
+              value: saga-postgres-rw
+            # NOTA (Fase 10, divergência do plano): order_svc só é dono do
+            # próprio banco, sem CREATEDB/CREATEROLE — usamos o superuser
+            # gerado pelo CNPG (`enableSuperuserAccess: true` no Cluster)
+            # para este Job de bootstrap local.
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef: { name: saga-postgres-superuser, key: username }
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: { name: saga-postgres-superuser, key: password }
+          command:
+            - sh
+            - -c
+            - |
+              for pair in "payment_db:payment_svc" "inventory_db:inventory_svc" "shipping_db:shipping_svc" "notification_db:notification_svc"; do
+                db="${pair%%:*}"; user="${pair##*:}";
+                psql -d postgres -c "SELECT 1 FROM pg_database WHERE datname = '${db}'" | grep -q 1 || \
+                  psql -d postgres -c "CREATE DATABASE ${db}";
+                psql -d postgres -c "SELECT 1 FROM pg_roles WHERE rolname = '${user}'" | grep -q 1 || \
+                  psql -d postgres -c "CREATE ROLE ${user} LOGIN PASSWORD 'changeme'";
+                psql -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE ${db} TO ${user}";
+              done

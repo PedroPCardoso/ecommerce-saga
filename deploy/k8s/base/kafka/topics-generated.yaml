@@ -1,0 +1,960 @@
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-notification-service-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.notification-service.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-notification-service-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.notification-service.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-notification-service-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.notification-service.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-notification-service-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.notification-service.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-order-projection-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.order-projection.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-order-projection-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.order-projection.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-order-projection-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.order-projection.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-order-projection-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.order-projection.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-payment-service-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.payment-service.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-payment-service-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.payment-service.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-payment-service-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.payment-service.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-payment-service-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.payment-service.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-saga-observer-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.saga-observer.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-saga-observer-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.saga-observer.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-saga-observer-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.saga-observer.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-saga-observer-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.saga-observer.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-shipping-service-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.shipping-service.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-shipping-service-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.shipping-service.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-shipping-service-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.shipping-service.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-inventory-v1-shipping-service-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.inventory.v1.shipping-service.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-inventory-service-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.inventory-service.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-inventory-service-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.inventory-service.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-inventory-service-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.inventory-service.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-inventory-service-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.inventory-service.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-notification-service-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.notification-service.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-notification-service-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.notification-service.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-notification-service-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.notification-service.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-notification-service-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.notification-service.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-payment-service-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.payment-service.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-payment-service-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.payment-service.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-payment-service-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.payment-service.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-payment-service-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.payment-service.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-saga-observer-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.saga-observer.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-saga-observer-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.saga-observer.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-saga-observer-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.saga-observer.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-saga-observer-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.saga-observer.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-shipping-service-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.shipping-service.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-shipping-service-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.shipping-service.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-shipping-service-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.shipping-service.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-orders-v1-shipping-service-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.orders.v1.shipping-service.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-inventory-service-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.inventory-service.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-inventory-service-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.inventory-service.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-inventory-service-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.inventory-service.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-inventory-service-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.inventory-service.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-notification-service-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.notification-service.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-notification-service-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.notification-service.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-notification-service-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.notification-service.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-notification-service-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.notification-service.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-order-projection-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.order-projection.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-order-projection-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.order-projection.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-order-projection-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.order-projection.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-order-projection-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.order-projection.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-saga-observer-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.saga-observer.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-saga-observer-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.saga-observer.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-saga-observer-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.saga-observer.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-payments-v1-saga-observer-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.payments.v1.saga-observer.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-inventory-service-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.inventory-service.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-inventory-service-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.inventory-service.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-inventory-service-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.inventory-service.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-inventory-service-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.inventory-service.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-notification-service-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.notification-service.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-notification-service-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.notification-service.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-notification-service-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.notification-service.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-notification-service-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.notification-service.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-order-projection-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.order-projection.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-order-projection-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.order-projection.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-order-projection-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.order-projection.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-order-projection-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.order-projection.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-payment-service-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.payment-service.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-payment-service-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.payment-service.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-payment-service-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.payment-service.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-payment-service-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.payment-service.retry-5s
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-saga-observer-dlt
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.saga-observer.DLT
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-saga-observer-retry-10m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.saga-observer.retry-10m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-saga-observer-retry-1m
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.saga-observer.retry-1m
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ecommerce-shipping-v1-saga-observer-retry-5s
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  topicName: ecommerce.shipping.v1.saga-observer.retry-5s
+  partitions: 3
+  replicas: 1

@@ -1,0 +1,80 @@
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: saga-kafka
+  namespace: ecommerce-saga
+  annotations:
+    strimzi.io/kraft: enabled
+    strimzi.io/node-pools: enabled
+spec:
+  kafka:
+    # NOTA (Fase 10, divergência do plano original): o operator Strimzi
+    # instalado nesta rodada (1.2.0, via `helm install strimzi/strimzi-kafka-operator`)
+    # só suporta Kafka 4.2.0/4.2.1/4.3.0/4.3.1 — a versão 3.9.0 do plano
+    # original está fora do range suportado por este operator. Usamos a
+    # mais recente suportada.
+    version: 4.3.1
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    config:
+      offsets.topic.replication.factor: 1
+      transaction.state.log.replication.factor: 1
+      transaction.state.log.min.isr: 1
+      default.replication.factor: 1
+      min.insync.replicas: 1
+      auto.create.topics.enable: 'false'
+      # NOTA (Fase 10, divergência do plano original): os defaults do
+      # quorum KRaft (controller.quorum.request.timeout.ms=2000,
+      # election.timeout.ms=1000) são agressivos demais para um nó único
+      # compartilhando CPU com outros operators no minikube local — o
+      # handshake TLS de auto-registro do controller estourava esses
+      # timeouts sob throttling de CPU, derrubando o broker logo após
+      # subir. Afrouxamos para valores mais tolerantes; puramente uma
+      # tunagem de ambiente local, sem efeito na semântica da saga.
+      controller.quorum.request.timeout.ms: 10000
+      controller.quorum.election.timeout.ms: 5000
+      controller.quorum.fetch.timeout.ms: 10000
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: saga-pool
+  namespace: ecommerce-saga
+  labels:
+    strimzi.io/cluster: saga-kafka
+spec:
+  replicas: 1
+  roles: [controller, broker]
+  storage:
+    type: persistent-claim
+    size: 5Gi
+    deleteClaim: false
+  # NOTA (Fase 10, divergência do plano original): o `resources` do Kafka
+  # migrou de `spec.kafka.resources` (Kafka CR) para `spec.resources`
+  # (KafkaNodePool) nesta versão do Strimzi — compute agora é por node pool.
+  # O limite de CPU original do plano (1 CPU) causava throttling suficiente
+  # para o self-registro do controller KRaft estourar os timeouts acima;
+  # subimos para 2 CPU de limite (ainda dentro do orçamento de 4 CPUs do
+  # minikube, com sobra dado que compose está parado).
+  resources:
+    requests: { memory: 1Gi, cpu: '1' }
+    limits: { memory: 2Gi, cpu: '2' }
+  # NOTA (Fase 10, divergência do plano original): diagnosticado via logs do
+  # CoreDNS — o broker/controller KRaft tenta se auto-registrar resolvendo o
+  # próprio nome curto (…svc, sem sufixo), que sempre bate NXDOMAIN antes de
+  # o resolver tentar o próximo domínio da busca (…svc.cluster.local, que aí
+  # sim resolve). Com ndots:5 (padrão do Kubernetes) essa corrida de tentativas
+  # eventualmente estoura os timeouts de registro do controller sob throttling
+  # de CPU do nó local. Reduzir ndots faz o resolver ir direto ao FQDN.
+  template:
+    pod:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: '2'

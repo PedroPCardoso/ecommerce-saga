@@ -1,0 +1,29 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: saga-postgres
+  namespace: ecommerce-saga
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  # NOTA (Fase 10, divergência do plano original): nesta versão do CloudNativePG
+  # o acesso superuser vem desabilitado por padrão (postura de segurança —
+  # sem isso não existe secret `postgres`/superuser algum). O `owner` do
+  # initdb (order_svc) só é dono do PRÓPRIO banco, sem CREATEDB/CREATEROLE —
+  # não dá pra criar os outros 4 databases/roles do Job de init sem um
+  # superuser. Habilitamos aqui só para permitir o Job local de dev; em
+  # produção real isso seria substituído por 5 Clusters CNPG de verdade
+  # (a mesma dívida documentada no plano) ou por um operator de bootstrap
+  # com permissões escopadas.
+  enableSuperuserAccess: true
+  storage:
+    size: 5Gi
+  resources:
+    requests: { memory: 512Mi, cpu: '250m' }
+    limits: { memory: 1Gi, cpu: '500m' }
+  bootstrap:
+    initdb:
+      database: order_db
+      owner: order_svc
+      secret:
+        name: saga-postgres-order-svc-credentials
