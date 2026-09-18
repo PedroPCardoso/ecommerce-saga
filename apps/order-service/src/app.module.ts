@@ -6,6 +6,7 @@ import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
 import { OutboxRelayService } from './infrastructure/outbox-relay.service.js';
 import { OrderProjectionConsumerService } from './infrastructure/order-projection-consumer.service.js';
+import { SagaTimeoutSweeperService } from './infrastructure/saga-timeout-sweeper.service.js';
 import { CreateOrderUseCase } from './application/create-order.use-case.js';
 import { OrderProjectionHandler } from './application/order-projection.handler.js';
 
@@ -18,6 +19,7 @@ import { OrderProjectionHandler } from './application/order-projection.handler.j
     CreateOrderUseCase,
     OrderProjectionHandler,
     OrderProjectionConsumerService,
+    SagaTimeoutSweeperService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })

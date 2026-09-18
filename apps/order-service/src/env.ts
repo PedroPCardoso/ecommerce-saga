@@ -11,6 +11,8 @@ const envSchema = z.object({
   KAFKA_CLIENT_ID_PREFIX: z.string().min(1).default('ecommerce'),
   JWT_SECRET: z.string().min(1),
   JWT_ISSUER: z.string().min(1),
+  SAGA_TIMEOUT_THRESHOLD_MS: z.coerce.number().int().positive().default(300_000), // 5 min
+  SAGA_TIMEOUT_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(30_000), // 30s
 });
 
 export const env = envSchema.parse(process.env);

@@ -143,7 +143,12 @@ const REQUIRED_COMPENSATIONS: Record<CancellationReason, readonly CompensationTy
   // (payment.failed fecha direto em CANCELLED; CUSTOMER_REQUEST não é
   // disparado por este projetor) — mapeados só para o Record ficar total.
   [CANCELLATION_REASON.PAYMENT_FAILED]: [],
-  [CANCELLATION_REASON.SAGA_TIMEOUT]: [],
+  // Sweeper desta fase só varre pedidos presos em PAYMENT_APPROVED (nunca chegaram a
+  // reservar estoque) — só o pagamento precisa voltar. Se um sweeper futuro passar a
+  // cobrir pedidos presos em STOCK_RESERVED também, este valor precisa virar
+  // [PAYMENT_REFUNDED, STOCK_RELEASED] E o sweeper precisa saber distinguir os dois
+  // casos (não é o caso hoje — ver saga-timeout-sweeper.service.ts).
+  [CANCELLATION_REASON.SAGA_TIMEOUT]: [COMPENSATION_TYPE.PAYMENT_REFUNDED],
   [CANCELLATION_REASON.CUSTOMER_REQUEST]: [],
 };
 
