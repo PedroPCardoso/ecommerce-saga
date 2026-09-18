@@ -8,6 +8,8 @@ import type { UnknownEnvelope } from '@ecommerce/contracts';
 import { OrderCreatedHandler, type OrderCreatedEvent } from './order-created.handler.js';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { PaymentApprovedHandler, type PaymentApprovedEvent } from './payment-approved.handler.js';
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { ShipmentFailedHandler, type ShipmentFailedEvent } from './shipment-failed.handler.js';
 
 /**
  * Decide qual handler chamar a partir de `envelope.eventType`. O envelope já
@@ -19,6 +21,7 @@ export class InventoryEventRouter {
   constructor(
     private readonly orderCreatedHandler: OrderCreatedHandler,
     private readonly paymentApprovedHandler: PaymentApprovedHandler,
+    private readonly shipmentFailedHandler: ShipmentFailedHandler,
   ) {}
 
   async route(envelope: UnknownEnvelope): Promise<void> {
@@ -29,10 +32,14 @@ export class InventoryEventRouter {
       case 'payment.approved':
         await this.paymentApprovedHandler.handle(envelope as PaymentApprovedEvent);
         return;
+      case 'shipment.failed':
+        await this.shipmentFailedHandler.handle(envelope as ShipmentFailedEvent);
+        return;
       default:
         // payment.failed (matriz de compensação: nada a fazer aqui), order.confirmed,
-        // order.cancelled, e qualquer eventType futuro (ex. payment.refunded na Fase 5)
-        // não são assunto do Inventory — ignora e deixa o offset comitar normalmente.
+        // order.cancelled, stock.unavailable (o próprio Inventory que publicou),
+        // stock.released (o próprio Inventory que publicou) — não são assunto de um
+        // handler novo aqui. Ignora e deixa o offset comitar normalmente.
         return;
     }
   }

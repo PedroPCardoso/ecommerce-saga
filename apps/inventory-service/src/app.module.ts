@@ -5,6 +5,7 @@ import { OutboxRelayService } from './infrastructure/outbox-relay.service.js';
 import { InventoryConsumerService } from './infrastructure/inventory-consumer.service.js';
 import { OrderCreatedHandler } from './application/order-created.handler.js';
 import { PaymentApprovedHandler } from './application/payment-approved.handler.js';
+import { ShipmentFailedHandler } from './application/shipment-failed.handler.js';
 import { InventoryEventRouter } from './application/inventory-event.router.js';
 
 @Module({
@@ -14,6 +15,7 @@ import { InventoryEventRouter } from './application/inventory-event.router.js';
     OutboxRelayService,
     OrderCreatedHandler,
     PaymentApprovedHandler,
+    ShipmentFailedHandler,
     InventoryEventRouter,
     InventoryConsumerService,
   ],

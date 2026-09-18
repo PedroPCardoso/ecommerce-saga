@@ -1,5 +1,5 @@
 import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { CONSUMER_GROUPS, TOPICS } from '@ecommerce/contracts';
+import { CONSUMER_GROUPS, SUBSCRIPTIONS } from '@ecommerce/contracts';
 import { EventProducer, KafkaConsumerRuntime } from '@ecommerce/kafka';
 import { env } from '../env.js';
 // Import de valor é obrigatório aqui: o NestJS resolve o token de injeção em runtime a
@@ -24,11 +24,10 @@ export class InventoryConsumerService implements OnModuleInit, OnModuleDestroy {
     this.runtime = new KafkaConsumerRuntime({
       brokers: env.KAFKA_BROKERS,
       groupId: CONSUMER_GROUPS.inventory,
-      // Escopo desta fase: só orders (aprende itens) + payments (gatilho da reserva).
-      // `shipping` já está em SUBSCRIPTIONS[inventory] — os tópicos de retry/DLT dele já
-      // foram criados por `pnpm topics:create` — mas consumir `shipment.failed` (para
-      // publicar `stock.released`) só é acrescentado na Fase 5.
-      sourceTopics: [TOPICS.orders, TOPICS.payments],
+      // orders (aprende itens) + payments (gatilho da reserva) + shipping (gatilho da
+      // liberação em shipment.failed) — os três já declarados em
+      // SUBSCRIPTIONS[inventory] (packages/contracts/src/topics.ts).
+      sourceTopics: SUBSCRIPTIONS[CONSUMER_GROUPS.inventory],
       producer: this.producer,
       handler: (ctx) => this.router.route(ctx.envelope),
     });
