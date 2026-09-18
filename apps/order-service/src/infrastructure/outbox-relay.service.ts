@@ -24,6 +24,7 @@ export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
       }
       await this.producer.publish(definition.topic, envelope, row.headers);
     },
+    serviceName: 'order-service',
   });
 
   async onModuleInit(): Promise<void> {

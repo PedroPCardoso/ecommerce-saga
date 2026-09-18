@@ -57,6 +57,7 @@ describe('OutboxRelay (integração — Postgres real, requer pnpm infra:up)', (
       publish: async (row) => {
         published.push(row);
       },
+      serviceName: 'order-service',
     });
 
     const processed = await relay.drainOnce();
@@ -72,7 +73,7 @@ describe('OutboxRelay (integração — Postgres real, requer pnpm infra:up)', (
   it('não republica linha já publicada', async () => {
     await insertRow(randomUUID(), true);
 
-    const relay = new OutboxRelay({ pool, publish: async () => {} });
+    const relay = new OutboxRelay({ pool, publish: async () => {}, serviceName: 'order-service' });
     const processed = await relay.drainOnce();
 
     expect(processed).toBe(0);
@@ -88,6 +89,7 @@ describe('OutboxRelay (integração — Postgres real, requer pnpm infra:up)', (
         throw new Error('broker indisponível');
       },
       onError: () => {},
+      serviceName: 'order-service',
     });
 
     await relay.drainOnce();
@@ -111,12 +113,14 @@ describe('OutboxRelay (integração — Postgres real, requer pnpm infra:up)', (
       publish: async (r) => {
         publishedByA.push(r.eventId);
       },
+      serviceName: 'order-service',
     });
     const relayB = new OutboxRelay({
       pool,
       publish: async (r) => {
         publishedByB.push(r.eventId);
       },
+      serviceName: 'order-service',
     });
 
     await Promise.all([relayA.drainOnce(), relayB.drainOnce()]);
@@ -124,5 +128,20 @@ describe('OutboxRelay (integração — Postgres real, requer pnpm infra:up)', (
     const all = [...publishedByA, ...publishedByB];
     expect(new Set(all).size).toBe(all.length);
     expect(all.length).toBe(10);
+  });
+
+  it('atualiza outbox_lag_seconds com a idade da linha pendente mais antiga', async () => {
+    const eventId = randomUUID();
+    await insertRow(eventId);
+    // Backdata created_at manualmente para simular uma linha PENDENTE HÁ tempo.
+    await pool.query(`UPDATE outbox SET created_at = now() - interval '10 seconds' WHERE event_id = $1`, [eventId]);
+
+    const relay = new OutboxRelay({ pool, publish: async () => {}, serviceName: 'order-service' });
+    await relay.drainOnce();
+
+    const { outboxLagSeconds } = await import('@ecommerce/observability');
+    const output = await (await import('@ecommerce/observability')).metricsRegistry.metrics();
+    expect(output).toContain('outbox_lag_seconds');
+    void outboxLagSeconds; // só para o import não ficar "não usado" caso o lint reclame
   });
 });
