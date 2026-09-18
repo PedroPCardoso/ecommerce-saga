@@ -322,6 +322,26 @@ services:
         condition: service_started
     networks: [saga]
 
+  # Painel observável (Fase 7b): SEM banco, SEM auth — ver
+  # docs/superpowers/plans/2026-09-18-fase7b-saga-observer.md (Global
+  # Constraints) para o porquê do escopo reduzido.
+  saga-observer:
+    build:
+      context: ../..
+      dockerfile: apps/saga-observer/Dockerfile
+    container_name: ecommerce-saga-observer
+    restart: unless-stopped
+    ports: ['3005:3005']
+    environment:
+      NODE_ENV: production
+      SAGA_OBSERVER_PORT: '3005'
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID_PREFIX: ecommerce
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks: [saga]
+
 networks:
   saga:
     driver: bridge

@@ -127,7 +127,7 @@ packages/contracts/    fonte ÚNICA dos contratos de evento e da topologia Kafka
 packages/kafka/        consumo com commit manual, retry escalonado, DLT      (Fase 2)
 packages/outbox/       Transactional Outbox + relay                          (Fase 2)
 packages/idempotency/  tabela de inbox + markProcessed() dentro da transação  (Fase 2)
-apps/                  os 5 serviços                                     (Fases 1 a 5)
+apps/                  os 5 serviços de negócio (Fases 1 a 5) + saga-observer (Fase 7b)
 deploy/docker/         infra local
 deploy/k8s|helm/       Kubernetes                                          (Fase 10)
 tools/dlq-inspector/   CLI para inspecionar e reprocessar a DLT              (Fase 6)
@@ -162,8 +162,8 @@ usar nenhum — o exemplo 03 mostra exatamente por quê.
 - [x] **Fase 2** — `packages/kafka` e `packages/idempotency`
 - [x] **Fases 3–5** — Payment, Inventory, Shipping, Notification (caminho feliz e `payment.failed` completos, ponta a ponta, contra Kafka/Postgres reais)
 - [x] **Fase 9** — Docker de produção (5 imagens multi-stage, non-root, 0 CVE HIGH/CRITICAL, docker-compose integrado)
-- [ ] **Fase 6** — resiliência, caos, replay, `dlq-inspector`
-- [ ] **Fase 7** — observabilidade · **7b** — Saga Observer (a UI ligada ao sistema real)
+- [x] **Fase 6** — resiliência, caos, replay, `dlq-inspector`
+- [x] **Fase 7** — observabilidade (tracing + métricas nos 5 serviços) · **7b** — `apps/saga-observer`: 6º serviço, só-consumidor, projeta a saga em memória e expõe via SSE (`GET /api/orders`, `GET /api/orders/stream`) um front estático (`public/index.html`) que mostra cada evento chegando ao vivo
 - [ ] **Fase 8** — C4 nível 3
 - [ ] **Fase 10** — Kubernetes / Minikube
 - [ ] **Fase 11** — versão orquestrada, para comparação (opcional)
@@ -192,3 +192,13 @@ stacktrace carrega payload e payload carrega PII.
 
 A revisão OWASP Top 10:2025 completa está na seção 8 do [plano](docs/PLAN.md), e o módulo
 [10](docs/aprender/10-do-docker-ao-kubernetes.md) cobre o que muda ao ir para o cluster.
+
+**Escopo reduzido, deliberado, do `saga-observer` (Fase 7b):** o painel em
+`http://localhost:3005` **não tem autenticação, não tem papel de operador, e não permite
+reprocessar a DLT nem consultar um endpoint `/internal/saga-debug/:orderId` por serviço** —
+qualquer coisa nessa rede local enxerga o painel. Isso é intencional: as três coisas juntas
+(auth + RBAC + audit log de quem reprocessou o quê) criam uma superfície administrativa nova
+que merece revisão de segurança dedicada, fora do escopo desta fase. Pelo mesmo motivo, o
+que o SSE expõe é só `{ orderId, eventType, status, occurredAt }` — nunca `customerId`,
+endereço, dado de pagamento ou qualquer outro campo de `payload` (A01/A09). Ver
+`docs/superpowers/plans/2026-09-18-fase7b-saga-observer.md` (Global Constraints).
