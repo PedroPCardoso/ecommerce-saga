@@ -118,7 +118,7 @@ por vez: é assim que se vê que o commit de offset acontece _depois_ do COMMIT 
 docs/aprender/         os 10 módulos — comece aqui
 docs/simulator/        o console interativo da saga (HTML, abre no navegador)
 docs/adr/              as 11 decisões, em MADR, com as consequências negativas escritas
-docs/architecture/     modelo C4 em Structurizr DSL (1 modelo → 4 níveis)
+docs/architecture/     modelo C4 em Structurizr DSL (Contexto, Contêineres, Componentes do Order Service — nível 4/máquina de estados fica no ASCII do §1 acima, de propósito)
 docs/PLAN.md           plano de execução completo, 13 fases
 
 examples/              6 exemplos executáveis contra Kafka e Postgres reais
@@ -126,7 +126,7 @@ examples/              6 exemplos executáveis contra Kafka e Postgres reais
 packages/contracts/    fonte ÚNICA dos contratos de evento e da topologia Kafka
 packages/kafka/        consumo com commit manual, retry escalonado, DLT      (Fase 2)
 packages/outbox/       Transactional Outbox + relay                          (Fase 2)
-packages/idempotency/  tabela de inbox + decorator @Idempotent               (Fase 2)
+packages/idempotency/  tabela de inbox + markProcessed() dentro da transação  (Fase 2)
 apps/                  os 5 serviços                                     (Fases 1 a 5)
 deploy/docker/         infra local
 deploy/k8s|helm/       Kubernetes                                          (Fase 10)
