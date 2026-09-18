@@ -1,9 +1,11 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { initTracing } from '@ecommerce/observability';
 import { AppModule } from './app.module.js';
 import { env } from './env.js';
 
 async function bootstrap(): Promise<void> {
+  initTracing('order-service');
   const app = await NestFactory.create(AppModule);
   await app.listen(env.ORDER_SERVICE_PORT);
   console.log(`[order-service] ouvindo na porta ${env.ORDER_SERVICE_PORT}`);

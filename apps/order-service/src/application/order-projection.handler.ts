@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { markProcessed } from '@ecommerce/idempotency';
 import { insertOutboxRow } from '@ecommerce/outbox';
+import { sagaCompensationsTotal, sagaDurationSeconds } from '@ecommerce/observability';
 import {
   CANCELLATION_REASON,
   CONSUMER_GROUPS,
@@ -22,6 +23,7 @@ import { PrismaService } from '../infrastructure/prisma.service.js';
 import {
   applyCompensationEvent,
   applyEvent,
+  COMPENSATION_TYPE_BY_EVENT,
   type CompensationEventType,
   type ProjectionEventType,
 } from './order-state-machine.js';
@@ -163,6 +165,10 @@ export class OrderProjectionHandler {
           `Pedido ${orderId} entrou em COMPENSATING via ${eventType} — aguardando compensação (payment.refunded/stock.released).`,
         );
       } else if (result.next === ORDER_STATUS.CONFIRMED) {
+        sagaDurationSeconds.observe(
+          { outcome: 'confirmed' },
+          (Date.now() - order.createdAt.getTime()) / 1000,
+        );
         const confirmedEnvelope = createEvent(orderEvents.orderConfirmed, {
           aggregateId: order.id,
           correlationId: envelope.correlationId,
@@ -187,6 +193,10 @@ export class OrderProjectionHandler {
       } else if (result.next === ORDER_STATUS.CANCELLED) {
         const reason = CANCELLATION_REASON_BY_EVENT[eventType];
         if (reason) {
+          sagaDurationSeconds.observe(
+            { outcome: 'cancelled' },
+            (Date.now() - order.createdAt.getTime()) / 1000,
+          );
           const cancelledEnvelope = createEvent(orderEvents.orderCancelled, {
             aggregateId: order.id,
             correlationId: envelope.correlationId,
@@ -261,7 +271,13 @@ export class OrderProjectionHandler {
         data: { status: result.next, compensationsReceived: result.compensationsReceived },
       });
 
+      sagaCompensationsTotal.inc({ compensationType: COMPENSATION_TYPE_BY_EVENT[eventType] });
+
       if (result.next === ORDER_STATUS.CANCELLED) {
+        sagaDurationSeconds.observe(
+          { outcome: 'cancelled' },
+          (Date.now() - order.createdAt.getTime()) / 1000,
+        );
         const cancelledEnvelope = createEvent(orderEvents.orderCancelled, {
           aggregateId: order.id,
           correlationId: envelope.correlationId,

@@ -121,7 +121,7 @@ export type CompensationResult =
   | { changed: false; reason: 'stale' }
   | { changed: false; reason: 'premature' };
 
-const COMPENSATION_TYPE_BY_EVENT: Record<CompensationEventType, CompensationType> = {
+export const COMPENSATION_TYPE_BY_EVENT: Record<CompensationEventType, CompensationType> = {
   'payment.refunded': COMPENSATION_TYPE.PAYMENT_REFUNDED,
   'stock.released': COMPENSATION_TYPE.STOCK_RELEASED,
 };

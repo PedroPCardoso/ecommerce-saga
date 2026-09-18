@@ -384,4 +384,29 @@ describe('OrderProjectionHandler (integração — Postgres real, requer pnpm in
     const received = order.compensationsReceived as string[];
     expect(received).toEqual(['STOCK_RELEASED']); // não duplicou
   });
+
+  it('caminho feliz registra saga_duration_seconds com outcome=confirmed', async () => {
+    const { metricsRegistry } = await import('@ecommerce/observability');
+    const orderId = await createTestOrder();
+
+    await handler.handle(makePaymentApproved(orderId));
+    await handler.handle(makeStockReserved(orderId));
+    await handler.handle(makeShipmentCreated(orderId));
+
+    const output = await metricsRegistry.metrics();
+    expect(output).toContain('saga_duration_seconds');
+    expect(output).toMatch(/saga_duration_seconds_count\{outcome="confirmed"\}/);
+  });
+
+  it('stock.unavailable + payment.refunded registra saga_compensations_total{compensationType="PAYMENT_REFUNDED"}', async () => {
+    const { metricsRegistry } = await import('@ecommerce/observability');
+    const orderId = await createTestOrder();
+
+    await handler.handle(makePaymentApproved(orderId));
+    await handler.handle(makeStockUnavailable(orderId));
+    await handler.handle(makePaymentRefunded(orderId));
+
+    const output = await metricsRegistry.metrics();
+    expect(output).toMatch(/saga_compensations_total\{compensationType="PAYMENT_REFUNDED"\}/);
+  });
 });

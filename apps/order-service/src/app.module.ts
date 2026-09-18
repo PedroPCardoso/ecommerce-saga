@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ObservabilityModule } from '@ecommerce/observability';
 import { OrdersController } from './api/orders.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
@@ -11,7 +12,7 @@ import { CreateOrderUseCase } from './application/create-order.use-case.js';
 import { OrderProjectionHandler } from './application/order-projection.handler.js';
 
 @Module({
-  imports: [ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 100 }] })],
+  imports: [ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 100 }] }), ObservabilityModule],
   controllers: [OrdersController, HealthController],
   providers: [
     PrismaService,

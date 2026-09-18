@@ -209,6 +209,9 @@ importers:
       '@ecommerce/kafka':
         specifier: workspace:*
         version: link:../../packages/kafka
+      '@ecommerce/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@ecommerce/outbox':
         specifier: workspace:*
         version: link:../../packages/outbox
