@@ -30,6 +30,28 @@ workspace "Sistema de Pedidos de E-commerce" "SAGA coreografada sobre Kafka" {
 
             orderService = container "Order Service" "Recebe o pedido, projeta o estado a partir dos eventos e vigia timeouts da saga." "NestJS / TypeScript" {
                 tags "Servico"
+
+                # --- Nível 3: componentes reais de apps/order-service/src, não uma
+                # aspiração — os nomes abaixo são os nomes das classes no código.
+                ordersController = component "OrdersController" "POST /orders, GET /orders/:id. Extrai customerId só do claim `sub` do JWT (A01)." "NestJS Controller"
+                jwtAuthGuard = component "JwtAuthGuard" "Valida o JWT (HS256, algoritmo pinado) antes de qualquer rota tocar o Controller." "NestJS Guard"
+                createOrderUseCase = component "CreateOrderUseCase" "Calcula o total no servidor, grava Order + Outbox + IdempotencyKey numa única transação." "Application Service"
+                orderProjectionHandler = component "OrderProjectionHandler" "Aplica OrderStateMachine a cada evento da saga; publica order.confirmed/order.cancelled ao fechar." "Application Service"
+                orderProjectionConsumer = component "OrderProjectionConsumerService" "Consumidor Kafka (grupo order-projection) que entrega os eventos ao OrderProjectionHandler." "Infrastructure"
+                orderStateMachine = component "order-state-machine.ts" "applyEvent/applyCompensationEvent — transição monotônica e idempotente, nunca lança." "Domain Logic"
+                sagaTimeoutSweeper = component "SagaTimeoutSweeperService" "Varre pedidos presos em PAYMENT_APPROVED e publica saga.timeout." "Infrastructure"
+                outboxRelay = component "OutboxRelayService" "Publica linhas pendentes da tabela outbox no Kafka (at-least-once)." "Infrastructure"
+                prismaService = component "PrismaService" "Acesso a Postgres (Order, Outbox, IdempotencyKey, ProcessedMessage)." "Infrastructure"
+                healthController = component "HealthController" "GET /health/live — raso, nunca checa dependência externa." "NestJS Controller"
+
+                ordersController -> jwtAuthGuard "Protegido por"
+                ordersController -> createOrderUseCase "Delega a criação do pedido"
+                createOrderUseCase -> prismaService "Grava Order + Outbox + IdempotencyKey"
+                orderProjectionConsumer -> orderProjectionHandler "Entrega o envelope"
+                orderProjectionHandler -> orderStateMachine "Decide a transição"
+                orderProjectionHandler -> prismaService "Atualiza Order, insere Outbox"
+                sagaTimeoutSweeper -> prismaService "Varre pedidos presos, insere Outbox"
+                outboxRelay -> prismaService "Lê linhas pendentes"
             }
             paymentService = container "Payment Service" "Autoriza o pagamento e estorna quando um passo POSTERIOR da saga falha." "NestJS / TypeScript" {
                 tags "Servico"
@@ -113,7 +135,17 @@ workspace "Sistema de Pedidos de E-commerce" "SAGA coreografada sobre Kafka" {
             description "Nível 2: os 5 serviços, o broker e um banco por serviço. Nenhuma flecha liga serviço a serviço: toda comunicação de negócio passa pelo log de eventos."
         }
 
+        component orderService "L3-OrderService" {
+            include *
+            autolayout tb
+            description "Nível 3: componentes do Order Service, nomeados exatamente como as classes em apps/order-service/src — o diagrama não desatualiza porque nasce dos mesmos nomes do código."
+        }
+
         styles {
+            element "Domain Logic" {
+                background #f9a825
+                color #000000
+            }
             element "Person" {
                 shape person
                 background #1168bd
