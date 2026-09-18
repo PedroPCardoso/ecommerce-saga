@@ -55,12 +55,13 @@ jobs:
       - name: Cria .env a partir do template
         run: cp .env.example .env
 
-      # Reaproveita o compose local: sobe só a infra (Kafka + 5 Postgres), não os
-      # serviços de aplicação — quem exercita o código é o `turbo run test` local.
-      - name: Sobe infra (Kafka + Postgres)
+      # Reaproveita o compose local: sobe só a infra (Kafka + 5 Postgres + Mailhog), não
+      # os serviços de aplicação — quem exercita o código é o `turbo run test` local.
+      # Mailhog entra porque notification-service testa contra ele de verdade.
+      - name: Sobe infra (Kafka + Postgres + Mailhog)
         run: |
           docker compose -f deploy/docker/docker-compose.yml up -d \
-            kafka postgres-order postgres-payment postgres-inventory postgres-shipping postgres-notification
+            kafka postgres-order postgres-payment postgres-inventory postgres-shipping postgres-notification mailhog
 
       - name: Espera Kafka e Postgres ficarem saudáveis
         run: |
@@ -77,6 +78,19 @@ jobs:
           echo "timeout esperando infra ficar saudável"
           docker compose -f deploy/docker/docker-compose.yml ps
           docker compose -f deploy/docker/docker-compose.yml logs kafka
+          exit 1
+
+      # Mailhog não tem HEALTHCHECK no compose — espera a API HTTP responder.
+      - name: Espera a API do Mailhog responder
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:18025/api/v2/messages > /dev/null; then
+              echo "mailhog pronto"; exit 0
+            fi
+            sleep 1
+          done
+          echo "timeout esperando o mailhog"
+          docker compose -f deploy/docker/docker-compose.yml logs mailhog
           exit 1
 
       - name: Cria os tópicos Kafka
