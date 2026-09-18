@@ -511,6 +511,40 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)
 
+  tools/dlq-inspector:
+    dependencies:
+      '@ecommerce/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ecommerce/kafka':
+        specifier: workspace:*
+        version: link:../../packages/kafka
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@swc-node/register':
+        specifier: ^1.12.1
+        version: 1.12.1(@swc/core@1.16.2)(@swc/types@0.1.28)(typescript@5.9.3)
+      '@swc/core':
+        specifier: ^1.16.2
+        version: 1.16.2
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      dotenv-cli:
+        specifier: ^7.4.2
+        version: 7.4.4
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)
+
 packages:
 
   '@babel/code-frame@7.29.7':
