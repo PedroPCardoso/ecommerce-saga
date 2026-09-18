@@ -58,6 +58,19 @@ function makeShipmentFailed(orderId: string) {
   });
 }
 
+function makeSagaTimedOut(orderId: string) {
+  return createEvent(orderEvents.sagaTimedOut, {
+    aggregateId: orderId,
+    correlationId: orderId,
+    producer: 'order-service-test@0.0.0',
+    payload: {
+      orderId,
+      stuckStatus: 'PAYMENT_APPROVED',
+      timedOutAt: new Date().toISOString(),
+    },
+  });
+}
+
 describe('RefundPaymentUseCase (integração — Postgres real, requer pnpm infra:up)', () => {
   const prisma = new PrismaService();
   const authorizePayment = new AuthorizePaymentUseCase(prisma);
@@ -103,6 +116,19 @@ describe('RefundPaymentUseCase (integração — Postgres real, requer pnpm infr
     });
     const payload = outboxRows[0]?.payload as { payload: { compensationFor: string } };
     expect(payload.payload.compensationFor).toBe('shipment.failed');
+  });
+
+  it('saga.timeout: estorna o pagamento AUTHORIZED e publica payment.refunded com compensationFor="saga.timeout"', async () => {
+    const orderId = randomUUID();
+    await authorizePayment.execute(makeOrderCreated(orderId, 2000));
+
+    await refundPayment.execute(makeSagaTimedOut(orderId));
+
+    const outboxRows = await prisma.client.outbox.findMany({
+      where: { aggregateId: orderId, eventType: 'payment.refunded' },
+    });
+    const payload = outboxRows[0]?.payload as { payload: { compensationFor: string } };
+    expect(payload.payload.compensationFor).toBe('saga.timeout');
   });
 
   it('reentrega do MESMO evento não estorna duas vezes — idempotência', async () => {

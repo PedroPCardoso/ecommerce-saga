@@ -16,9 +16,10 @@ import { markProcessed } from '@ecommerce/idempotency';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { PrismaService } from '../infrastructure/prisma.service.js';
 
-const COMPENSATION_FOR_BY_EVENT: Record<string, 'stock.unavailable' | 'shipment.failed'> = {
+const COMPENSATION_FOR_BY_EVENT: Record<string, 'stock.unavailable' | 'shipment.failed' | 'saga.timeout'> = {
   'stock.unavailable': 'stock.unavailable',
   'shipment.failed': 'shipment.failed',
+  'saga.timeout': 'saga.timeout',
 };
 
 /**

@@ -28,6 +28,7 @@ export class PaymentEventRouter {
         return;
       case 'stock.unavailable':
       case 'shipment.failed':
+      case 'saga.timeout':
         await this.refundPayment.execute(envelope);
         return;
       default:
