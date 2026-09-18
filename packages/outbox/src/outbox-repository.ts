@@ -1,3 +1,5 @@
+import { context, propagation } from '@opentelemetry/api';
+
 /**
  * Cliente mínimo, estrutural: qualquer PrismaClient ou
  * Prisma.TransactionClient satisfaz isto sem que este pacote precise
@@ -26,6 +28,16 @@ export interface OutboxRow {
  * Prisma que grava o efeito de domínio — é isso que torna o par atômico.
  */
 export async function insertOutboxRow(tx: RawSqlClient, row: OutboxRow): Promise<void> {
+  // Captura o traceparent do span ATIVO no momento em que este efeito nasce (ex.: dentro
+  // do span criado por KafkaConsumerRuntime ao processar o evento causador) e o grava
+  // junto com a linha. É isto — não contexto em memória — que sobrevive ao hop pelo
+  // Postgres até o outbox relay publicar esta linha, minutos ou milissegundos depois,
+  // numa invocação completamente desligada da call stack de quem a escreveu. Sem
+  // nenhum span ativo (ex.: o request HTTP que cria o pedido), não injeta nada — o
+  // primeiro `EventProducer.publish` desta linha nasce como raiz de um trace novo.
+  const headers = { ...(row.headers ?? {}) };
+  propagation.inject(context.active(), headers);
+
   const affected = await tx.$executeRawUnsafe(
     `INSERT INTO outbox (event_id, aggregate_id, aggregate_type, event_type, payload, headers)
      VALUES ($1::uuid, $2, $3, $4, $5::jsonb, $6::jsonb)`,
@@ -34,7 +46,7 @@ export async function insertOutboxRow(tx: RawSqlClient, row: OutboxRow): Promise
     row.aggregateType,
     row.eventType,
     JSON.stringify(row.envelope),
-    JSON.stringify(row.headers ?? {}),
+    JSON.stringify(headers),
   );
 
   if (affected !== 1) {

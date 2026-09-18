@@ -11,8 +11,10 @@ import {
 import type { EventProducer } from './producer.js';
 import { classifyError } from './error-classification.js';
 import { buildRedirectHeaders } from './retry-headers.js';
-import { context, propagation } from '@opentelemetry/api';
+import { context, propagation, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
 import { dlqMessagesTotal, kafkaConsumerLag } from '@ecommerce/observability';
+
+const tracer = trace.getTracer('@ecommerce/kafka');
 
 export interface MessageContext {
   envelope: UnknownEnvelope;
@@ -124,6 +126,29 @@ export class KafkaConsumerRuntime {
     }
   }
 
+  /**
+   * Extrai o `traceparent` dos headers da mensagem e chama o handler DENTRO de um span
+   * novo, filho do contexto extraído — sem isto, `context.with()` sozinho propagaria o
+   * span REMOTO (o do publisher) como ativo, mas nunca criaria um span LOCAL visível no
+   * Jaeger para este serviço, e a lista de serviços em `/api/services` ficaria vazia
+   * mesmo com o traceparent chegando certinho. `kind: CONSUMER` e o nome com o tópico
+   * são o mínimo pra distinguir hops na UI.
+   */
+  private async runHandlerTraced(topic: string, headers: EachMessagePayload['message']['headers'], envelope: UnknownEnvelope): Promise<void> {
+    const extractedContext = propagation.extract(context.active(), this.headersToRecord(headers));
+    await tracer.startActiveSpan(`kafka.consume ${topic}`, { kind: SpanKind.CONSUMER }, extractedContext, async (span) => {
+      try {
+        await this.handler({ envelope });
+      } catch (error) {
+        span.recordException(error as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+        throw error;
+      } finally {
+        span.end();
+      }
+    });
+  }
+
   private async processMainMessage(consumer: Consumer, payload: EachMessagePayload): Promise<void> {
     const { topic, partition, message } = payload;
     const commit = () =>
@@ -138,9 +163,8 @@ export class KafkaConsumerRuntime {
       return;
     }
 
-    const extractedContext = propagation.extract(context.active(), this.headersToRecord(message.headers));
     try {
-      await context.with(extractedContext, () => this.handler({ envelope }));
+      await this.runHandlerTraced(topic, message.headers, envelope);
     } catch (error) {
       await this.route(topic, partition, message, error, 0);
       await commit();
@@ -186,9 +210,8 @@ export class KafkaConsumerRuntime {
       return;
     }
 
-    const extractedContext = propagation.extract(context.active(), this.headersToRecord(message.headers));
     try {
-      await context.with(extractedContext, () => this.handler({ envelope }));
+      await this.runHandlerTraced(sourceTopic, message.headers, envelope);
     } catch (error) {
       await this.route(sourceTopic, partition, message, error, attempt + 1);
       await commit();

@@ -567,6 +567,9 @@ importers:
       '@ecommerce/observability':
         specifier: workspace:*
         version: link:../observability
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.1
       pg:
         specifier: ^8.13.1
         version: 8.23.0

@@ -225,6 +225,7 @@ services:
       KAFKA_CLIENT_ID_PREFIX: ecommerce
       JWT_SECRET: dev-only-not-a-real-secret-change-me
       JWT_ISSUER: ecommerce-local
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     depends_on:
       kafka:
         condition: service_healthy
@@ -245,6 +246,7 @@ services:
       PAYMENT_DATABASE_URL: postgresql://payment_svc:changeme@postgres-payment:5432/payment_db?schema=public
       KAFKA_BROKERS: kafka:9092
       KAFKA_CLIENT_ID_PREFIX: ecommerce
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     depends_on:
       kafka:
         condition: service_healthy
@@ -265,6 +267,7 @@ services:
       INVENTORY_DATABASE_URL: postgresql://inventory_svc:changeme@postgres-inventory:5432/inventory_db?schema=public
       KAFKA_BROKERS: kafka:9092
       KAFKA_CLIENT_ID_PREFIX: ecommerce
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     depends_on:
       kafka:
         condition: service_healthy
@@ -285,6 +288,7 @@ services:
       SHIPPING_DATABASE_URL: postgresql://shipping_svc:changeme@postgres-shipping:5432/shipping_db?schema=public
       KAFKA_BROKERS: kafka:9092
       KAFKA_CLIENT_ID_PREFIX: ecommerce
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     depends_on:
       kafka:
         condition: service_healthy
@@ -308,6 +312,7 @@ services:
       SMTP_HOST: mailhog
       SMTP_PORT: '1025'
       SMTP_FROM: no-reply@example.com
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     depends_on:
       kafka:
         condition: service_healthy

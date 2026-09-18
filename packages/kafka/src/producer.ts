@@ -1,6 +1,8 @@
 import { CompressionTypes, Kafka, logLevel, type Producer } from 'kafkajs';
 import type { UnknownEnvelope } from '@ecommerce/contracts';
-import { context, propagation } from '@opentelemetry/api';
+import { context, propagation, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
+
+const tracer = trace.getTracer('@ecommerce/kafka');
 
 export interface EventProducerOptions {
   brokers: string[];
@@ -48,18 +50,37 @@ export class EventProducer {
     headers: Record<string, string> = {},
   ): Promise<void> {
     this.assertConnected();
-    const tracedHeaders = { ...headers };
-    // W3C traceparent (docs/PLAN.md, Fase 7): se houver um span ativo no momento da
-    // publicação, o header carrega o trace ID adiante — é isto que faz um `orderId`
-    // aberto no Jaeger mostrar a saga inteira como UM trace, não cinco desconexos.
-    // Sem span ativo (ex.: fora de uma request HTTP ou de um handler de mensagem já
-    // rastreado), injeta nada — não é erro, só não há o que propagar.
-    propagation.inject(context.active(), tracedHeaders);
-    await this.producer!.send({
-      topic,
-      compression: CompressionTypes.GZIP,
-      messages: [{ key: envelope.aggregateId, value: JSON.stringify(envelope), headers: tracedHeaders }],
-    });
+    // Se `headers` já carrega um `traceparent` (ex.: propagado através da tabela outbox —
+    // ver insertOutboxRow em @ecommerce/outbox), usa-o como PAI do novo span: é isto que
+    // faz o trace sobreviver ao hop por Postgres entre "consumir uma mensagem" e
+    // "publicar o efeito dela" — nenhum contexto em memória atravessa esse hop sozinho,
+    // porque o outbox relay roda em um timer completamente desligado da call stack
+    // original. Sem traceparent nos headers (ex.: order.created, criado pela requisição
+    // HTTP), isto não acha nada para extrair e o span abaixo nasce como raiz de um trace
+    // novo — o começo natural da saga.
+    const parentContext = propagation.extract(context.active(), headers);
+    await tracer.startActiveSpan(
+      `kafka.publish ${topic}`,
+      { kind: SpanKind.PRODUCER },
+      parentContext,
+      async (span) => {
+        try {
+          const tracedHeaders = { ...headers };
+          propagation.inject(context.active(), tracedHeaders);
+          await this.producer!.send({
+            topic,
+            compression: CompressionTypes.GZIP,
+            messages: [{ key: envelope.aggregateId, value: JSON.stringify(envelope), headers: tracedHeaders }],
+          });
+        } catch (error) {
+          span.recordException(error as Error);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+          throw error;
+        } finally {
+          span.end();
+        }
+      },
+    );
   }
 
   /** Usado pelo consumer runtime (Task 4) para redirecionar bytes originais para retry/DLT sem re-serializar. */
