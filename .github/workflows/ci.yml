@@ -22,6 +22,18 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      # Prisma Client de cada serviço tem output customizado (`./generated`) — não
+      # existe até rodar `generate` uma vez. typecheck/build falham sem isto, mesmo
+      # sem precisar de um Postgres de verdade (generate só lê o schema).
+      - name: Cria .env a partir do template
+        run: cp .env.example .env
+      - name: Gera o Prisma Client de cada serviço
+        run: |
+          for svc in order payment inventory shipping notification; do
+            pnpm --filter "@ecommerce/${svc}-service" run prisma:generate
+          done
+
       - run: pnpm exec turbo run lint typecheck build
 
   test:
