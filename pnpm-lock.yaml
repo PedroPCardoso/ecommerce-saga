@@ -488,6 +488,15 @@ importers:
         specifier: ^2.2.4
         version: 2.2.4
     devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.23.1
+      dotenv-cli:
+        specifier: ^7.4.2
+        version: 7.4.4
+      pg:
+        specifier: ^8.13.1
+        version: 8.23.0
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
