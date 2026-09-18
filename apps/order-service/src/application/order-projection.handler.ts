@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { markProcessed } from '@ecommerce/idempotency';
 import { insertOutboxRow } from '@ecommerce/outbox';
 import { sagaCompensationsTotal, sagaDurationSeconds } from '@ecommerce/observability';
@@ -86,6 +87,13 @@ export class OrderProjectionHandler {
     const eventType = envelope.eventType;
     const orderId = (envelope.payload as { orderId: string }).orderId;
 
+    // Coletado dentro da transação, só EXECUTADO depois dela commitar (fora do
+    // `$transaction`, abaixo). Métrica incrementada dentro da transação conta de novo a
+    // cada retry se o commit falhar depois (rollback não desfaz `Counter.inc`/
+    // `Histogram.observe` — eles não são transacionais como o Postgres), inflando
+    // `saga_duration_seconds`/alimentando falso positivo no alerta de taxa de compensação.
+    let emitMetrics: (() => void) | undefined;
+
     await this.prisma.client.$transaction(async (tx) => {
       const isNew = await markProcessed(tx, envelope.eventId, CONSUMER_GROUPS.orderProjection);
       if (!isNew) return; // reentrega do mesmo evento — já decidimos isto antes
@@ -165,10 +173,8 @@ export class OrderProjectionHandler {
           `Pedido ${orderId} entrou em COMPENSATING via ${eventType} — aguardando compensação (payment.refunded/stock.released).`,
         );
       } else if (result.next === ORDER_STATUS.CONFIRMED) {
-        sagaDurationSeconds.observe(
-          { outcome: 'confirmed' },
-          (Date.now() - order.createdAt.getTime()) / 1000,
-        );
+        const sagaDurationSecondsValue = (Date.now() - order.createdAt.getTime()) / 1000;
+        emitMetrics = () => sagaDurationSeconds.observe({ outcome: 'confirmed' }, sagaDurationSecondsValue);
         const confirmedEnvelope = createEvent(orderEvents.orderConfirmed, {
           aggregateId: order.id,
           correlationId: envelope.correlationId,
@@ -193,10 +199,8 @@ export class OrderProjectionHandler {
       } else if (result.next === ORDER_STATUS.CANCELLED) {
         const reason = CANCELLATION_REASON_BY_EVENT[eventType];
         if (reason) {
-          sagaDurationSeconds.observe(
-            { outcome: 'cancelled' },
-            (Date.now() - order.createdAt.getTime()) / 1000,
-          );
+          const sagaDurationSecondsValue = (Date.now() - order.createdAt.getTime()) / 1000;
+          emitMetrics = () => sagaDurationSeconds.observe({ outcome: 'cancelled' }, sagaDurationSecondsValue);
           const cancelledEnvelope = createEvent(orderEvents.orderCancelled, {
             aggregateId: order.id,
             correlationId: envelope.correlationId,
@@ -223,6 +227,8 @@ export class OrderProjectionHandler {
         }
       }
     });
+
+    emitMetrics?.();
   }
 
   private async handleCompensationEvent(
@@ -230,6 +236,7 @@ export class OrderProjectionHandler {
     eventType: CompensationEventType,
   ): Promise<void> {
     const orderId = (envelope.payload as { orderId: string }).orderId;
+    let emitMetrics: (() => void) | undefined;
 
     await this.prisma.client.$transaction(async (tx) => {
       const isNew = await markProcessed(tx, envelope.eventId, CONSUMER_GROUPS.orderProjection);
@@ -244,11 +251,12 @@ export class OrderProjectionHandler {
         throw error;
       }
 
+      const compensationsReceivedBefore = (order.compensationsReceived as CompensationType[]) ?? [];
       const result = applyCompensationEvent(
         {
           status: orderStatusSchema.parse(order.status),
           compensationReason: order.compensationReason as CancellationReason | null,
-          compensationsReceived: (order.compensationsReceived as CompensationType[]) ?? [],
+          compensationsReceived: compensationsReceivedBefore,
         },
         eventType,
       );
@@ -266,18 +274,33 @@ export class OrderProjectionHandler {
         return;
       }
 
-      await tx.order.update({
-        where: { id: orderId },
+      // Guarda contra lost update: shipment.failed exige DUAS compensações
+      // (PAYMENT_REFUNDED + STOCK_RELEASED) que chegam em tópicos diferentes
+      // (payments.v1/inventory.v1) e podem ser processadas CONCORRENTEMENTE por
+      // consumidores diferentes deste mesmo consumer group (o principal e um degrau da
+      // escada de retry, ou duas réplicas em Kubernetes). Sem o `compensationsReceived`
+      // na cláusula WHERE, duas transações que leem `[]` ao mesmo tempo cada uma grava
+      // só a SUA compensação, uma sobrescrevendo a outra — o pedido nunca vê as duas
+      // juntas e fica preso em COMPENSATING para sempre, com `order.cancelled` nunca
+      // publicado (achado crítico da revisão final: mesma classe de bug do lost-update
+      // já corrigido em `handle()`, só que pela porta de um array em vez de um enum).
+      const updated = await tx.order.updateMany({
+        where: {
+          id: orderId,
+          status: ORDER_STATUS.COMPENSATING,
+          compensationsReceived: { equals: compensationsReceivedBefore as unknown as Prisma.InputJsonValue },
+        },
         data: { status: result.next, compensationsReceived: result.compensationsReceived },
       });
-
-      sagaCompensationsTotal.inc({ compensationType: COMPENSATION_TYPE_BY_EVENT[eventType] });
-
-      if (result.next === ORDER_STATUS.CANCELLED) {
-        sagaDurationSeconds.observe(
-          { outcome: 'cancelled' },
-          (Date.now() - order.createdAt.getTime()) / 1000,
+      if (updated.count === 0) {
+        throw new Error(
+          `Pedido ${orderId} teve compensationsReceived alterado concorrentemente ao processar ${eventType} — retentando`,
         );
+      }
+
+      const compensationType = COMPENSATION_TYPE_BY_EVENT[eventType];
+      if (result.next === ORDER_STATUS.CANCELLED) {
+        const sagaDurationSecondsValue = (Date.now() - order.createdAt.getTime()) / 1000;
         const cancelledEnvelope = createEvent(orderEvents.orderCancelled, {
           aggregateId: order.id,
           correlationId: envelope.correlationId,
@@ -299,7 +322,16 @@ export class OrderProjectionHandler {
           eventType: 'order.cancelled',
           envelope: cancelledEnvelope,
         });
+
+        emitMetrics = () => {
+          sagaCompensationsTotal.inc({ compensationType });
+          sagaDurationSeconds.observe({ outcome: 'cancelled' }, sagaDurationSecondsValue);
+        };
+      } else {
+        emitMetrics = () => sagaCompensationsTotal.inc({ compensationType });
       }
     });
+
+    emitMetrics?.();
   }
 }

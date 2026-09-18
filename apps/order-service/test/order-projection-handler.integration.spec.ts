@@ -349,6 +349,50 @@ describe('OrderProjectionHandler (integração — Postgres real, requer pnpm in
     expect(payload.payload.compensationsApplied.sort()).toEqual(['PAYMENT_REFUNDED', 'STOCK_RELEASED']);
   });
 
+  it('CONCORRÊNCIA — payment.refunded e stock.released processados ao mesmo tempo (Promise.all) não perdem nenhuma compensação', async () => {
+    // Achado crítico da revisão final: duas transações lendo compensationsReceived=[]
+    // ao mesmo tempo e cada uma gravando só a SUA compensação (sem guarda no WHERE)
+    // faziam a segunda sobrescrever a primeira — o pedido nunca via as duas juntas e
+    // ficava preso em COMPENSATING para sempre. A guarda (compensationsReceived no
+    // WHERE do updateMany) faz a segunda transação ver count=0 e LANÇAR — exatamente
+    // como a escada de retry do @ecommerce/kafka já trata (mensagem reprocessada,
+    // nada perdido). Este teste simula isso: dispara as duas ao mesmo tempo, reentrega
+    // manualmente a que falhou (o que a escada de retry faria de verdade), e confirma
+    // que as DUAS compensações terminam registradas — nunca uma sobrescrevendo a outra.
+    const orderId = await createTestOrder();
+    await handler.handle(makePaymentApproved(orderId));
+    await handler.handle(makeStockReserved(orderId));
+    await handler.handle(makeShipmentFailed(orderId));
+
+    const refundedEnvelope = makePaymentRefunded(orderId);
+    const releasedEnvelope = makeStockReleased(orderId);
+
+    const results = await Promise.allSettled([
+      handler.handle(refundedEnvelope),
+      handler.handle(releasedEnvelope),
+    ]);
+
+    // Reentrega manual de quem perdeu a corrida — é o que a escada de retry
+    // (5s/1m/10m) do @ecommerce/kafka faria ao reprocessar a MESMA mensagem.
+    for (const [index, result] of results.entries()) {
+      if (result.status === 'rejected') {
+        await handler.handle(index === 0 ? refundedEnvelope : releasedEnvelope);
+      }
+    }
+
+    const order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('CANCELLED'); // nunca deve ficar preso em COMPENSATING
+    expect((order.compensationsReceived as string[]).sort()).toEqual([
+      'PAYMENT_REFUNDED',
+      'STOCK_RELEASED',
+    ]);
+
+    const outboxRows = await prisma.client.outbox.findMany({
+      where: { aggregateId: orderId, eventType: 'order.cancelled' },
+    });
+    expect(outboxRows).toHaveLength(1); // fechou exatamente uma vez, mesmo com a corrida
+  });
+
   it('RACE CONDITION — payment.refunded chega ANTES de o pedido entrar em COMPENSATING: falha retriável sem deixar rastro', async () => {
     const orderId = await createTestOrder();
     const refundedEnvelope = makePaymentRefunded(orderId);

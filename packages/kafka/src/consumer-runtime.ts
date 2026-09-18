@@ -91,7 +91,12 @@ export class KafkaConsumerRuntime {
     }
 
     this.lagPollTimer = setInterval(() => {
-      void this.pollConsumerLag();
+      // .catch() aqui é defesa em profundidade, não o principal: pollConsumerLag() já
+      // tem seu próprio try/catch. Sem isto, uma rejeição vazando dali (ver comentário
+      // dentro do método) seria uma unhandled rejection dentro de um setInterval — o
+      // Node mata o processo por causa de telemetria, exatamente o que o try/catch
+      // interno diz que não pode acontecer.
+      this.pollConsumerLag().catch(() => {});
     }, 15_000);
   }
 
@@ -113,8 +118,13 @@ export class KafkaConsumerRuntime {
         ]);
         const committedByPartition = new Map(committed[0]?.partitions.map((p) => [p.partition, p.offset]) ?? []);
         for (const wm of watermarks) {
-          const committedOffset = Number(committedByPartition.get(wm.partition) ?? '0');
-          const lag = Math.max(0, Number(wm.high) - committedOffset);
+          // kafkajs devolve o OFFSET COMO STRING '-1' (não `undefined`) quando o grupo
+          // nunca commitou nesta partição — `?? '0'` nunca dispara nesse caso, e
+          // `high - (-1)` inflava o lag por +1 sempre. Trata os dois casos: partição sem
+          // commit vira lag = high (fila inteira pendente), não high+1.
+          const rawCommitted = committedByPartition.get(wm.partition);
+          const committedOffset = rawCommitted === undefined || rawCommitted === '-1' ? 0 : Number(rawCommitted);
+          const lag = rawCommitted === '-1' ? Number(wm.high) : Math.max(0, Number(wm.high) - committedOffset);
           kafkaConsumerLag.set({ group: this.groupId, topic, partition: String(wm.partition) }, lag);
         }
       }
@@ -122,7 +132,12 @@ export class KafkaConsumerRuntime {
       // Falha ao medir lag não pode derrubar o consumidor real — é telemetria, não
       // efeito de negócio. Próxima passada (15s) tenta de novo.
     } finally {
-      await admin.disconnect();
+      // admin.disconnect() pode rejeitar (broker caindo, socket já morto — o mesmo
+      // cenário que já pode ter feito o bloco try acima falhar) — um `finally` que
+      // lança substitui silenciosamente o catch de cima e vira, de novo, uma rejeição
+      // não tratada no `.catch(() => {})` de quem chamou. Telemetria não pode matar o
+      // processo por nenhum dos dois caminhos.
+      await admin.disconnect().catch(() => {});
     }
   }
 
