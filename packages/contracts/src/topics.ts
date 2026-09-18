@@ -28,6 +28,8 @@ export const CONSUMER_GROUPS = {
   notification: 'notification-service',
   /** Projeção de estado do pedido dentro do Order Service. */
   orderProjection: 'order-projection',
+  /** Painel observável (Fase 7b) — só lê, nunca escreve, nenhum efeito de negócio. */
+  sagaObserver: 'saga-observer',
 } as const;
 
 export type ConsumerGroup = (typeof CONSUMER_GROUPS)[keyof typeof CONSUMER_GROUPS];
@@ -109,6 +111,7 @@ export const SUBSCRIPTIONS: Readonly<Record<ConsumerGroup, readonly BusinessTopi
     TOPICS.shipping,
   ],
   [CONSUMER_GROUPS.orderProjection]: [TOPICS.payments, TOPICS.inventory, TOPICS.shipping],
+  [CONSUMER_GROUPS.sagaObserver]: [TOPICS.orders, TOPICS.payments, TOPICS.inventory, TOPICS.shipping],
 };
 
 /** Toda a topologia derivada: negócio + retry + DLT. Usado pelo script de criação de tópicos. */
