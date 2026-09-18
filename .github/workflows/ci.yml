@@ -103,8 +103,13 @@ jobs:
             pnpm --filter "@ecommerce/${svc}-service" run prisma:deploy
           done
 
-      - name: Roda a suíte de testes completa
-        run: pnpm exec turbo run test
+      # --concurrency=1: os testes de cada serviço compartilham o MESMO Kafka/Postgres/
+      # Mailhog (é infra real, não mock) — rodar dois serviços em paralelo faz um e-mail
+      # ou evento de um serviço aparecer no assert do outro. Localmente isso nunca
+      # aparece porque sempre validamos `pnpm --filter <svc> test` um de cada vez;
+      # `turbo run test` sem isto paraleliza por padrão e producer cross-talk.
+      - name: Roda a suíte de testes completa (sequencial — infra real compartilhada)
+        run: pnpm exec turbo run test --concurrency=1
 
       - name: Logs da infra (se falhar)
         if: failure()
