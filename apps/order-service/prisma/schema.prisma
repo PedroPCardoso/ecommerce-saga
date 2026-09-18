@@ -9,15 +9,21 @@ datasource db {
 }
 
 model Order {
-  id               String   @id
-  customerId       String   @map("customer_id")
-  items            Json
-  totalAmountCents Int      @map("total_amount_cents")
-  currency         String
-  status           String   @default("PENDING")
-  shippingAddress  Json     @map("shipping_address")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  id                    String   @id
+  customerId            String   @map("customer_id")
+  items                 Json
+  totalAmountCents      Int      @map("total_amount_cents")
+  currency              String
+  status                String   @default("PENDING")
+  // Preenchidos só quando status vira COMPENSATING — null enquanto o pedido
+  // não precisou de compensação. compensationReason diz QUAL falha disparou a
+  // compensação (decide quais compensações são exigidas); compensationsReceived
+  // acumula os tipos já confirmados ('PAYMENT_REFUNDED', 'STOCK_RELEASED').
+  compensationReason    String?  @map("compensation_reason")
+  compensationsReceived Json     @default("[]") @map("compensations_received")
+  shippingAddress       Json     @map("shipping_address")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("orders")
 }

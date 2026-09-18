@@ -107,6 +107,38 @@ function makeShipmentFailed(orderId: string) {
   });
 }
 
+function makePaymentRefunded(orderId: string) {
+  return createEvent(paymentEvents.paymentRefunded, {
+    aggregateId: orderId,
+    correlationId: orderId,
+    producer: 'payment-service-test@0.0.0',
+    payload: {
+      paymentId: randomUUID(),
+      orderId,
+      refundId: randomUUID(),
+      amountCents: 2000,
+      currency: 'BRL',
+      compensationFor: 'stock.unavailable',
+      refundedAt: new Date().toISOString(),
+    },
+  });
+}
+
+function makeStockReleased(orderId: string) {
+  return createEvent(inventoryEvents.stockReleased, {
+    aggregateId: orderId,
+    correlationId: orderId,
+    producer: 'inventory-service-test@0.0.0',
+    payload: {
+      reservationId: randomUUID(),
+      orderId,
+      items: [{ sku: 'BOOK-001', quantity: 2 }],
+      compensationFor: 'shipment.failed',
+      releasedAt: new Date().toISOString(),
+    },
+  });
+}
+
 describe('OrderProjectionHandler (integração — Postgres real, requer pnpm infra:up)', () => {
   const prisma = new PrismaService();
   const handler = new OrderProjectionHandler(prisma);
@@ -261,5 +293,95 @@ describe('OrderProjectionHandler (integração — Postgres real, requer pnpm in
 
     const order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
     expect(order.status).toBe('STOCK_RESERVED');
+  });
+
+  it('stock.unavailable + payment.refunded fecha o pedido em CANCELLED com compensationsApplied=[PAYMENT_REFUNDED] e publica order.cancelled', async () => {
+    const orderId = await createTestOrder();
+
+    await handler.handle(makePaymentApproved(orderId));
+    await handler.handle(makeStockUnavailable(orderId));
+
+    let order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('COMPENSATING');
+    expect(order.compensationReason).toBe('STOCK_UNAVAILABLE');
+
+    await handler.handle(makePaymentRefunded(orderId));
+
+    order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('CANCELLED');
+
+    const outboxRows = await prisma.client.outbox.findMany({
+      where: { aggregateId: orderId, eventType: 'order.cancelled' },
+    });
+    expect(outboxRows).toHaveLength(1);
+    const payload = outboxRows[0]?.payload as {
+      payload: { reason: string; compensationsApplied: string[] };
+    };
+    expect(payload.payload.reason).toBe('STOCK_UNAVAILABLE');
+    expect(payload.payload.compensationsApplied).toEqual(['PAYMENT_REFUNDED']);
+  });
+
+  it('shipment.failed exige payment.refunded E stock.released — só fecha quando as duas chegarem, em qualquer ordem', async () => {
+    const orderId = await createTestOrder();
+
+    await handler.handle(makePaymentApproved(orderId));
+    await handler.handle(makeStockReserved(orderId));
+    await handler.handle(makeShipmentFailed(orderId));
+
+    let order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('COMPENSATING');
+    expect(order.compensationReason).toBe('SHIPMENT_FAILED');
+
+    // stock.released chega PRIMEIRO — não fecha ainda, falta payment.refunded.
+    await handler.handle(makeStockReleased(orderId));
+    order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('COMPENSATING');
+
+    // payment.refunded chega DEPOIS — agora sim as duas chegaram, fecha.
+    await handler.handle(makePaymentRefunded(orderId));
+    order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('CANCELLED');
+
+    const outboxRows = await prisma.client.outbox.findMany({
+      where: { aggregateId: orderId, eventType: 'order.cancelled' },
+    });
+    const payload = outboxRows[0]?.payload as { payload: { compensationsApplied: string[] } };
+    expect(payload.payload.compensationsApplied.sort()).toEqual(['PAYMENT_REFUNDED', 'STOCK_RELEASED']);
+  });
+
+  it('RACE CONDITION — payment.refunded chega ANTES de o pedido entrar em COMPENSATING: falha retriável sem deixar rastro', async () => {
+    const orderId = await createTestOrder();
+    const refundedEnvelope = makePaymentRefunded(orderId);
+
+    // Pedido ainda em PENDING — nem payment.approved chegou.
+    await expect(handler.handle(refundedEnvelope)).rejects.toThrow();
+
+    const processed = await prisma.client.processedMessage.findUnique({
+      where: {
+        eventId_consumerGroup: {
+          eventId: refundedEnvelope.eventId,
+          consumerGroup: 'order-projection',
+        },
+      },
+    });
+    expect(processed).toBeNull();
+
+    const order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('PENDING'); // não regrediu nem avançou
+  });
+
+  it('reentrega do MESMO evento de compensação não conta a compensação duas vezes', async () => {
+    const orderId = await createTestOrder();
+    await handler.handle(makePaymentApproved(orderId));
+    await handler.handle(makeStockReserved(orderId));
+    await handler.handle(makeShipmentFailed(orderId));
+    const releasedEnvelope = makeStockReleased(orderId);
+
+    await handler.handle(releasedEnvelope);
+    await handler.handle(releasedEnvelope);
+
+    const order = await prisma.client.order.findUniqueOrThrow({ where: { id: orderId } });
+    const received = order.compensationsReceived as string[];
+    expect(received).toEqual(['STOCK_RELEASED']); // não duplicou
   });
 });
