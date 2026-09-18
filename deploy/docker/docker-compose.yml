@@ -168,6 +168,7 @@ services:
       - '--storage.tsdb.retention.time=6h'
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
     networks: [saga]
 
   grafana:

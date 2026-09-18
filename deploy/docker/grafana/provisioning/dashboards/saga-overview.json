@@ -1,0 +1,44 @@
+{
+  "title": "Saga — visão geral",
+  "uid": "saga-overview",
+  "schemaVersion": 39,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Duração da saga (p50/p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum(rate(saga_duration_seconds_bucket[5m])) by (le, outcome))", "legendFormat": "p50 {{outcome}}" },
+        { "expr": "histogram_quantile(0.95, sum(rate(saga_duration_seconds_bucket[5m])) by (le, outcome))", "legendFormat": "p95 {{outcome}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Taxa de compensação",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(saga_compensations_total[5m])) by (compensationType)", "legendFormat": "{{compensationType}}" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Mensagens na DLT",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "sum(rate(dlq_messages_total[5m])) by (topic, consumerGroup)", "legendFormat": "{{topic}} / {{consumerGroup}}" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Lag do consumidor",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "kafka_consumer_lag", "legendFormat": "{{group}} / {{topic}} / p{{partition}}" }
+      ]
+    }
+  ]
+}
