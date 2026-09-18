@@ -66,6 +66,9 @@ importers:
       '@ecommerce/kafka':
         specifier: workspace:*
         version: link:../../packages/kafka
+      '@ecommerce/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@ecommerce/outbox':
         specifier: workspace:*
         version: link:../../packages/outbox
@@ -139,6 +142,9 @@ importers:
       '@ecommerce/kafka':
         specifier: workspace:*
         version: link:../../packages/kafka
+      '@ecommerce/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@nestjs/common':
         specifier: ^11.0.1
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -297,6 +303,9 @@ importers:
       '@ecommerce/kafka':
         specifier: workspace:*
         version: link:../../packages/kafka
+      '@ecommerce/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@ecommerce/outbox':
         specifier: workspace:*
         version: link:../../packages/outbox
@@ -370,6 +379,9 @@ importers:
       '@ecommerce/kafka':
         specifier: workspace:*
         version: link:../../packages/kafka
+      '@ecommerce/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@ecommerce/outbox':
         specifier: workspace:*
         version: link:../../packages/outbox
