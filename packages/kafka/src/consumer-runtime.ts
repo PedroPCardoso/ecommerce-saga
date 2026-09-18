@@ -11,6 +11,8 @@ import {
 import type { EventProducer } from './producer.js';
 import { classifyError } from './error-classification.js';
 import { buildRedirectHeaders } from './retry-headers.js';
+import { context, propagation } from '@opentelemetry/api';
+import { dlqMessagesTotal, kafkaConsumerLag } from '@ecommerce/observability';
 
 export interface MessageContext {
   envelope: UnknownEnvelope;
@@ -46,6 +48,7 @@ export class KafkaConsumerRuntime {
   private readonly handler: MessageHandler;
   private readonly producer: EventProducer;
   private consumers: Consumer[] = [];
+  private lagPollTimer: NodeJS.Timeout | null = null;
 
   constructor(opts: KafkaConsumerRuntimeOptions) {
     this.kafka = new Kafka({
@@ -84,11 +87,41 @@ export class KafkaConsumerRuntime {
         this.consumers.push(consumer);
       }
     }
+
+    this.lagPollTimer = setInterval(() => {
+      void this.pollConsumerLag();
+    }, 15_000);
   }
 
   async stop(): Promise<void> {
+    if (this.lagPollTimer) clearInterval(this.lagPollTimer);
     await Promise.all(this.consumers.map((consumer) => consumer.disconnect()));
     this.consumers = [];
+  }
+
+  /** Atualiza kafka_consumer_lag = high watermark - offset commitado, por partição. */
+  private async pollConsumerLag(): Promise<void> {
+    const admin = this.kafka.admin();
+    try {
+      await admin.connect();
+      for (const topic of this.sourceTopics) {
+        const [committed, watermarks] = await Promise.all([
+          admin.fetchOffsets({ groupId: this.groupId, topics: [topic] }),
+          admin.fetchTopicOffsets(topic),
+        ]);
+        const committedByPartition = new Map(committed[0]?.partitions.map((p) => [p.partition, p.offset]) ?? []);
+        for (const wm of watermarks) {
+          const committedOffset = Number(committedByPartition.get(wm.partition) ?? '0');
+          const lag = Math.max(0, Number(wm.high) - committedOffset);
+          kafkaConsumerLag.set({ group: this.groupId, topic, partition: String(wm.partition) }, lag);
+        }
+      }
+    } catch {
+      // Falha ao medir lag não pode derrubar o consumidor real — é telemetria, não
+      // efeito de negócio. Próxima passada (15s) tenta de novo.
+    } finally {
+      await admin.disconnect();
+    }
   }
 
   private async processMainMessage(consumer: Consumer, payload: EachMessagePayload): Promise<void> {
@@ -105,8 +138,9 @@ export class KafkaConsumerRuntime {
       return;
     }
 
+    const extractedContext = propagation.extract(context.active(), this.headersToRecord(message.headers));
     try {
-      await this.handler({ envelope });
+      await context.with(extractedContext, () => this.handler({ envelope }));
     } catch (error) {
       await this.route(topic, partition, message, error, 0);
       await commit();
@@ -152,8 +186,9 @@ export class KafkaConsumerRuntime {
       return;
     }
 
+    const extractedContext = propagation.extract(context.active(), this.headersToRecord(message.headers));
     try {
-      await this.handler({ envelope });
+      await context.with(extractedContext, () => this.handler({ envelope }));
     } catch (error) {
       await this.route(sourceTopic, partition, message, error, attempt + 1);
       await commit();
@@ -163,6 +198,14 @@ export class KafkaConsumerRuntime {
     // Mesmo raciocínio de processMainMessage: sucesso do handler + falha do commit não
     // é falha de processamento — deixa propagar em vez de desviar para o próximo degrau.
     await commit();
+  }
+
+  private headersToRecord(headers: EachMessagePayload['message']['headers']): Record<string, string> {
+    const record: Record<string, string> = {};
+    for (const [key, value] of Object.entries(headers ?? {})) {
+      if (value !== undefined) record[key] = value.toString();
+    }
+    return record;
   }
 
   private parse(value: Buffer | null): UnknownEnvelope {
@@ -228,6 +271,7 @@ export class KafkaConsumerRuntime {
     console.error(
       `[kafka] ${sourceTopic} → DLT ${dlt} (grupo=${this.groupId}, tentativas=${retryCount}, erro=${errorMessageOf(error)})`,
     );
+    dlqMessagesTotal.inc({ topic: sourceTopic, consumerGroup: this.groupId });
   }
 }
 

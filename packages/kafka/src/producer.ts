@@ -1,5 +1,6 @@
 import { CompressionTypes, Kafka, logLevel, type Producer } from 'kafkajs';
 import type { UnknownEnvelope } from '@ecommerce/contracts';
+import { context, propagation } from '@opentelemetry/api';
 
 export interface EventProducerOptions {
   brokers: string[];
@@ -47,10 +48,17 @@ export class EventProducer {
     headers: Record<string, string> = {},
   ): Promise<void> {
     this.assertConnected();
+    const tracedHeaders = { ...headers };
+    // W3C traceparent (docs/PLAN.md, Fase 7): se houver um span ativo no momento da
+    // publicação, o header carrega o trace ID adiante — é isto que faz um `orderId`
+    // aberto no Jaeger mostrar a saga inteira como UM trace, não cinco desconexos.
+    // Sem span ativo (ex.: fora de uma request HTTP ou de um handler de mensagem já
+    // rastreado), injeta nada — não é erro, só não há o que propagar.
+    propagation.inject(context.active(), tracedHeaders);
     await this.producer!.send({
       topic,
       compression: CompressionTypes.GZIP,
-      messages: [{ key: envelope.aggregateId, value: JSON.stringify(envelope), headers }],
+      messages: [{ key: envelope.aggregateId, value: JSON.stringify(envelope), headers: tracedHeaders }],
     });
   }
 

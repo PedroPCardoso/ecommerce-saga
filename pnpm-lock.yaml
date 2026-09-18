@@ -484,10 +484,19 @@ importers:
       '@ecommerce/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@ecommerce/observability':
+        specifier: workspace:*
+        version: link:../observability
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.1
       kafkajs:
         specifier: ^2.2.4
         version: 2.2.4
     devDependencies:
+      '@opentelemetry/sdk-trace-node':
+        specifier: ^1.30.0
+        version: 1.30.1(@opentelemetry/api@1.9.1)
       '@types/pg':
         specifier: ^8.11.10
         version: 8.23.1
