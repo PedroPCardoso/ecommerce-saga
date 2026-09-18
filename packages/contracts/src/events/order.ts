@@ -56,3 +56,22 @@ export const orderCancelled = defineEvent({
     cancelledAt: z.string().datetime({ offset: true }),
   }),
 });
+
+/**
+ * Publicado pelo `SagaTimeoutSweeperService` (Order Service) quando um pedido
+ * fica tempo demais preso num estado não-terminal sem o próximo evento da
+ * saga chegar (docs/PLAN.md, Fase 6). Quem reage é quem tiver algo a desfazer
+ * — hoje só o Payment Service (`RefundPaymentUseCase`, I4) — nunca o próprio
+ * Order Service: ele só ANUNCIA o timeout, não decide o que os outros fazem.
+ */
+export const sagaTimedOut = defineEvent({
+  type: 'saga.timeout',
+  version: 1,
+  aggregateType: 'order',
+  topic: TOPICS.orders,
+  payload: z.object({
+    orderId: z.string().uuid(),
+    stuckStatus: z.enum(['PENDING', 'PAYMENT_APPROVED', 'STOCK_RESERVED']),
+    timedOutAt: z.string().datetime({ offset: true }),
+  }),
+});

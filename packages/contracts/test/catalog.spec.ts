@@ -56,6 +56,12 @@ describe('catálogo de eventos (contrato)', () => {
           "version": 1,
         },
         {
+          "aggregateType": "order",
+          "topic": "ecommerce.orders.v1",
+          "type": "saga.timeout",
+          "version": 1,
+        },
+        {
           "aggregateType": "shipment",
           "topic": "ecommerce.shipping.v1",
           "type": "shipment.created",
