@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+  // Output dedicado: sem isto, o client gerado vai para o local padrão
+  // `node_modules/@prisma/client`, que o pnpm resolve para a MESMA entrada
+  // física do store de conteúdo endereçável para todo pacote que dependa de
+  // `@prisma/client` na mesma versão — inclusive os outros serviços deste
+  // monorepo, que têm schemas diferentes. `prisma generate` aqui sobrescreveria
+  // o client de outro serviço (e vice-versa), quebrando o typecheck de um
+  // serviço sempre que outro rodasse `prisma generate` por último. `**/prisma/
+  // generated/` já está no .gitignore da raiz do monorepo — a convenção é
+  // isolar o client gerado por serviço (order-service é a única exceção, ver
+  // comentário no schema dele).
+  output = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("ORCHESTRATOR_DATABASE_URL")
+}
+
+/// Único agregado deste harness (Fase 11, ADR-0012). `status` é a MESMA
+/// informação que, na coreografia, está espalhada em 5 bancos diferentes —
+/// aqui é uma linha só. `items`/`address` ficam congelados na criação (JSON)
+/// porque os executores "burros" não têm banco próprio: o orquestrador é
+/// quem carrega o dado adiante a cada comando.
+model OrchestratedOrder {
+  id          String   @id
+  status      String
+  amountCents Int      @map("amount_cents")
+  currency    String
+  items       Json
+  address     Json
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("orchestrated_orders")
+}
